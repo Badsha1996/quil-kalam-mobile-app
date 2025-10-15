@@ -1,42 +1,53 @@
 {
   "expo": {
-    "name": "quil-kalam-mobile-app",
-    "slug": "quil-kalam-mobile-app",
+    "name": "quilkalam",
+    "slug": "quilkalam",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "quilkalammobileapp",
+    "icon": "./assets/images/solid-bg.jpg",
+    "scheme": "quilkalam",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "splash": {
+        "image": "./assets/images/transparent-bg.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff"
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/transparent-bg.png",
+        "backgroundColor": "#ffffff"
+      },
+      "splash": {
+        "image": "./assets/images/transparent-bg.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff",
+        "mdpi": "./assets/images/transparent-bg.png",
+        "hdpi": "./assets/images/transparent-bg.png",
+        "xhdpi": "./assets/images/transparent-bg.png",
+        "xxhdpi": "./assets/images/transparent-bg.png",
+        "xxxhdpi": "./assets/images/transparent-bg.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "bundler": "metro",
+      "favicon": "./assets/images/transparent-bg.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/transparent-bg.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
+          "backgroundColor": "#ffffff"
         }
       ]
     ],

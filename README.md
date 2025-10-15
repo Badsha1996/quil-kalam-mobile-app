@@ -1,50 +1,123 @@
-# Welcome to your Expo app 👋
+# QuilKalam Mobile App
+<p align="center">
+  <img src="./assets/images/transparent-bg.png" alt="QuilKalam Logo" width="300"/>
+</p>
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+QuilKalam is a mobile application for writers and readers, providing an intuitive platform to write, organize, and share stories. Built with [Expo](https://expo.dev/), [React Native](https://reactnative.dev/), [NativeWind](https://www.nativewind.dev/), and [Tailwind CSS](https://tailwindcss.com/), it offers a modern, animated, and responsive user experience.
 
-## Get started
+---
 
-1. Install dependencies
+## Features
 
-   ```bash
+- ✍️ **Distraction-Free Writing**: Focus on creativity with a clean, minimal editor.
+- 📚 **Story Organization**: Manage multiple projects, chapters, and ideas.
+- 👥 **Community**: Connect with readers and other writers.
+- 🎯 **Smart Tools**: Progress tracking and intelligent suggestions.
+- 🎨 **Beautiful UI**: Animated transitions and custom theming with Tailwind CSS.
+
+## Getting Started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (v18+ recommended)
+- [Yarn](https://yarnpkg.com/) or [npm](https://www.npmjs.com/)
+- [Expo CLI](https://docs.expo.dev/get-started/installation/):  
+  ```sh
+  npm install -g expo-cli
+  ```
+
+### Installation
+
+1. **Clone the repository:**
+   ```sh
+   git clone https://github.com/your-username/quil-kalam-mobile-app.git
+   cd quil-kalam-mobile-app
+   ```
+
+2. **Install dependencies:**
+   ```sh
    npm install
+   # or
+   yarn install
    ```
 
-2. Start the app
-
-   ```bash
-   npx expo start
+3. **Start the development server:**
+   ```sh
+   npm run start
+   # or
+   yarn start
    ```
 
-In the output, you'll find options to open the app in a
+4. **Run on your device:**
+   - For Android: `npm run android`
+   - For iOS: `npm run ios`
+   - For Web: `npm run web`
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Development
 
-## Get a fresh project
+- **Code Style:**  
+  - Uses [ESLint](https://eslint.org/) with Expo config.
+  - Tailwind CSS for styling via [NativeWind](https://www.nativewind.dev/).
+- **Type Checking:**  
+  - TypeScript strict mode enabled.
+- **Hot Reloading:**  
+  - Supported via Expo.
 
-When you're ready, run:
+### Useful Scripts
 
-```bash
-npm run reset-project
-```
+| Script           | Description                      |
+|------------------|----------------------------------|
+| `npm run start`  | Start Expo development server    |
+| `npm run android`| Run app on Android emulator      |
+| `npm run ios`    | Run app on iOS simulator         |
+| `npm run web`    | Run app in web browser           |
+| `npm run lint`   | Run ESLint checks                |
+| `npm run reset-project` | Clean and reset project   |
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+---
 
-## Learn more
+## Configuration
 
-To learn more about developing your project with Expo, look at the following resources:
+- **Tailwind CSS:**  
+  Configured in [`tailwind.config.js`](tailwind.config.js) and [`app/global.css`](app/global.css).
+- **Metro Bundler:**  
+  Custom config in [`metro.config.js`](metro.config.js) for NativeWind.
+- **TypeScript:**  
+  Paths and strict mode in [`tsconfig.json`](tsconfig.json).
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+---
 
-## Join the community
+## Folder Details
 
-Join our community of developers creating universal apps.
+- [`app/`](app): Main application screens and navigation.
+- [`components/`](components): Reusable UI components.
+- [`assets/`](assets): Images and icons.
+- [`constants/`](constants): Shared constants (e.g., icon definitions).
+- [`types/`](types): TypeScript type definitions.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+---
+
+## Contributing
+
+1. Fork the repository.
+2. Create your feature branch: `git checkout -b feature/your-feature`
+3. Commit your changes: `git commit -am 'Add some feature'`
+4. Push to the branch: `git push origin feature/your-feature`
+5. Open a pull request.
+
+---
+
+## License
+
+This project is licensed under the MIT License.
+
+---
+
+## Acknowledgements
+
+- [Expo](https://expo.dev/)
+- [React Native](https://reactnative.dev/)
+- [NativeWind](https://www.nativewind.dev/)
+- [Tailwind CSS](https://tailwindcss.com/)
