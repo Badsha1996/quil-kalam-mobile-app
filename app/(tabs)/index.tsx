@@ -1,8 +1,7 @@
 import Background from "@/components/common/Background";
 import FeatureCard from "@/components/index/FeatureCard";
 import StatCard from "@/components/index/StatCard";
-import React from "react";
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   Animated,
   ScrollView,
@@ -53,16 +52,16 @@ export default function Index() {
               transform: [{ translateY: heroSlide }, { scale: heroScale }],
             }}
           >
-            <View className="w-20 h-20 rounded-3xl bg-gray-300 justify-center items-center mb-6">
+            <View className="w-20 h-20 rounded-3xl bg-gray-300 dark:bg-gray-100 justify-center items-center mb-6">
               <Text className="text-5xl">✍🏻</Text>
             </View>
 
             <Text className="text-5xl mb-3 font-bold text-center">
-              <Text className="text-dark-100">Quil</Text>
+              <Text className="text-dark-100 dark:text-white">Quil</Text>
               <Text className="text-primary">Kalam</Text>
             </Text>
 
-            <Text className="text-lg text-dark-100 italic mb-8 text-center leading-7">
+            <Text className="text-lg text-dark-100 dark:text-white italic mb-8 text-center leading-7">
               "Where every voice has a stroy to tell"
             </Text>
 
@@ -76,7 +75,7 @@ export default function Index() {
                 elevation: 8,
               }}
             >
-              <Text className="text-gray-900 font-bold text-base">
+              <Text className="text-gray-900 dark:text-gray-600 font-bold text-base">
                 Start Your Journey
               </Text>
             </TouchableOpacity>
@@ -109,7 +108,7 @@ export default function Index() {
 
         {/* Features Section */}
         <View className="px-6">
-          <Text className="text-3xl font-extrabold text-gray-900 mb-6 text-center">
+          <Text className="text-3xl font-extrabold text-gray-900 dark:text-white mb-6 text-center">
             Why Writers Love Us
           </Text>
 
@@ -143,7 +142,7 @@ export default function Index() {
         </View>
 
         {/* CTA Section */}
-        <View className="mx-6 mt-10 mb-10 bg-dark-200 rounded-3xl p-8 items-center">
+        <View className="mx-6 mt-10 mb-10 bg-dark-200 dark:bg-gray-800 rounded-3xl p-8 items-center">
           <Text className="text-2xl font-extrabold text-white mb-3 text-center">
             Ready to Write?
           </Text>

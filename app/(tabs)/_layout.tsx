@@ -2,7 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Tabs } from "expo-router";
 import React, { useEffect, useRef } from "react";
-import { Animated, View } from "react-native";
+import { Animated, useColorScheme, View } from "react-native";
 
 type TabsIconProps = {
   iconName: keyof typeof MaterialIcons.glyphMap;
@@ -51,7 +51,10 @@ const TabsIcon = ({ iconName, focused, title }: TabsIconProps) => {
   });
 
   return (
-    <View className="flex justify-center items-center relative" style={{ width: 60, height: 60 }}>
+    <View
+      className="flex justify-center items-center relative"
+      style={{ width: 60, height: 60 }}
+    >
       {/* Background Gradient */}
       <Animated.View
         className="absolute"
@@ -84,9 +87,9 @@ const TabsIcon = ({ iconName, focused, title }: TabsIconProps) => {
 
         <Animated.Text
           className="text-[10px] font-semibold mt-1 tracking-wide"
-          style={{ 
+          style={{
             opacity: focused ? 1 : 0.7,
-            color: focused ? "#ffffff" : "#64748b"
+            color: focused ? "#ffffff" : "#64748b",
           }}
         >
           {title}
@@ -97,6 +100,8 @@ const TabsIcon = ({ iconName, focused, title }: TabsIconProps) => {
 };
 
 const Layout = () => {
+  const colorScheme = useColorScheme();
+
   return (
     <Tabs
       screenOptions={{
@@ -107,18 +112,18 @@ const Layout = () => {
           right: 0,
           bottom: 0,
           height: 70,
-          backgroundColor: "#ffffff",
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
           borderTopWidth: 1,
-          borderTopColor: "#f1f5f9",
           elevation: 10,
-          shadowColor: "#000000",
+          shadowColor: "#000",
           shadowOffset: { width: 0, height: -2 },
           shadowOpacity: 0.1,
           shadowRadius: 10,
           paddingBottom: 10,
           paddingTop: 10,
+          backgroundColor: colorScheme === "dark" ? "#111827" : "#ffffff",
+          borderTopColor: colorScheme === "dark" ? "#1f2937" : "#f1f5f9",
         },
       }}
     >

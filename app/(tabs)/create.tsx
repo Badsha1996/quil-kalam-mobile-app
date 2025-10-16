@@ -1,20 +1,22 @@
 import Background from "@/components/common/Background";
+import { createProject } from "@/utils/database";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  Alert,
 } from "react-native";
-import { createProject } from "@/utils/database";
 
 const create = () => {
   const router = useRouter();
-  const [projectType, setProjectType] = useState<"novel" | "poetry" | "shortStory" | "manuscript" | null>(null);
+  const [projectType, setProjectType] = useState<
+    "novel" | "poetry" | "shortStory" | "manuscript" | null
+  >(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [genre, setGenre] = useState("");
@@ -65,7 +67,9 @@ const create = () => {
         genre: genre || undefined,
         authorName: authorName.trim() || undefined,
         writingTemplate: writingTemplate as any,
-        targetWordCount: targetWordCount ? parseInt(targetWordCount) : undefined,
+        targetWordCount: targetWordCount
+          ? parseInt(targetWordCount)
+          : undefined,
       });
 
       console.log("Project created with ID:", projectId);
@@ -76,13 +80,19 @@ const create = () => {
           onPress: () => {
             // map project types to available routes in the app
             type AllowedRoute = "/novel/[id]" | "/poetry/[id]";
-            const routeMap: Record<"novel" | "poetry" | "shortStory" | "manuscript", AllowedRoute> = {
+            const routeMap: Record<
+              "novel" | "poetry" | "shortStory" | "manuscript",
+              AllowedRoute
+            > = {
               novel: "/novel/[id]",
               poetry: "/poetry/[id]",
               shortStory: "/novel/[id]",
               manuscript: "/novel/[id]",
             };
-            const pathname = routeMap[projectType as "novel" | "poetry" | "shortStory" | "manuscript"] ?? "/novel/[id]";
+            const pathname =
+              routeMap[
+                projectType as "novel" | "poetry" | "shortStory" | "manuscript"
+              ] ?? "/novel/[id]";
             router.push({ pathname, params: { id: String(projectId) } });
           },
         },
@@ -108,8 +118,18 @@ const create = () => {
   const projectTypes = [
     { value: "novel", label: "Novel", icon: "📖", desc: "Long-form fiction" },
     { value: "poetry", label: "Poetry", icon: "✍️", desc: "Verses & poems" },
-    { value: "shortStory", label: "Short Story", icon: "📝", desc: "Brief narratives" },
-    { value: "manuscript", label: "Manuscript", icon: "📄", desc: "General writing" },
+    {
+      value: "shortStory",
+      label: "Short Story",
+      icon: "📝",
+      desc: "Brief narratives",
+    },
+    {
+      value: "manuscript",
+      label: "Manuscript",
+      icon: "📄",
+      desc: "General writing",
+    },
   ];
 
   const templates = [
@@ -121,9 +141,20 @@ const create = () => {
   ];
 
   const genres = [
-    "Fiction", "Fantasy", "Mystery", "Romance", "Sci-Fi", 
-    "Horror", "Thriller", "Literary", "Historical", "Contemporary",
-    "Young Adult", "Adventure", "Drama", "Other"
+    "Fiction",
+    "Fantasy",
+    "Mystery",
+    "Romance",
+    "Sci-Fi",
+    "Horror",
+    "Thriller",
+    "Literary",
+    "Historical",
+    "Contemporary",
+    "Young Adult",
+    "Adventure",
+    "Drama",
+    "Other",
   ];
 
   return (
@@ -184,9 +215,7 @@ const create = () => {
                 <Text className="text-lg font-bold text-gray-900 mb-1">
                   {type.label}
                 </Text>
-                <Text className="text-xs text-gray-600">
-                  {type.desc}
-                </Text>
+                <Text className="text-xs text-gray-600">{type.desc}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -251,12 +280,16 @@ const create = () => {
                   key={g}
                   onPress={() => setGenre(g)}
                   className={`px-5 py-3 rounded-full active:opacity-80 ${
-                    genre === g ? "bg-primary" : "bg-light-100"
+                    genre === g
+                      ? "bg-primary "
+                      : "bg-light-100 dark:bg-gray-500"
                   }`}
                 >
                   <Text
                     className={`${
-                      genre === g ? "text-white font-bold" : "text-gray-600 font-semibold"
+                      genre === g
+                        ? "text-white font-bold"
+                        : "text-gray-600 font-semibold"
                     } text-sm`}
                   >
                     {g}
