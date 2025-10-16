@@ -14,10 +14,13 @@ import { createProject } from "@/utils/database";
 
 const create = () => {
   const router = useRouter();
-  const [projectType, setProjectType] = useState<"novel" | "poetry" | null>(null);
+  const [projectType, setProjectType] = useState<"novel" | "poetry" | "shortStory" | "manuscript" | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [genre, setGenre] = useState("");
+  const [authorName, setAuthorName] = useState("");
+  const [targetWordCount, setTargetWordCount] = useState("");
+  const [writingTemplate, setWritingTemplate] = useState<string>("freeform");
 
   const heroFade = useRef(new Animated.Value(0)).current;
   const heroSlide = useRef(new Animated.Value(-50)).current;
@@ -46,7 +49,7 @@ const create = () => {
 
   const handleCreateProject = () => {
     if (!projectType) {
-      Alert.alert("Select Type", "Please choose Novel or Poetry");
+      Alert.alert("Select Type", "Please choose a project type");
       return;
     }
     if (!title.trim()) {
@@ -55,15 +58,32 @@ const create = () => {
     }
 
     try {
-      // Save to database
-      const projectId = createProject(projectType, title, description, genre);
+      const projectId = createProject({
+        type: projectType,
+        title: title.trim(),
+        description: description.trim(),
+        genre: genre || undefined,
+        authorName: authorName.trim() || undefined,
+        writingTemplate: writingTemplate as any,
+        targetWordCount: targetWordCount ? parseInt(targetWordCount) : undefined,
+      });
+
       console.log("Project created with ID:", projectId);
 
       Alert.alert("Success", "Project created successfully!", [
         {
-          text: "View Library",
+          text: "View Project",
           onPress: () => {
-            router.push("/search");
+            // map project types to available routes in the app
+            type AllowedRoute = "/novel/[id]" | "/poetry/[id]";
+            const routeMap: Record<"novel" | "poetry" | "shortStory" | "manuscript", AllowedRoute> = {
+              novel: "/novel/[id]",
+              poetry: "/poetry/[id]",
+              shortStory: "/novel/[id]",
+              manuscript: "/novel/[id]",
+            };
+            const pathname = routeMap[projectType as "novel" | "poetry" | "shortStory" | "manuscript"] ?? "/novel/[id]";
+            router.push({ pathname, params: { id: String(projectId) } });
           },
         },
         {
@@ -73,6 +93,9 @@ const create = () => {
             setTitle("");
             setDescription("");
             setGenre("");
+            setAuthorName("");
+            setTargetWordCount("");
+            setWritingTemplate("freeform");
           },
         },
       ]);
@@ -82,16 +105,25 @@ const create = () => {
     }
   };
 
+  const projectTypes = [
+    { value: "novel", label: "Novel", icon: "📖", desc: "Long-form fiction" },
+    { value: "poetry", label: "Poetry", icon: "✍️", desc: "Verses & poems" },
+    { value: "shortStory", label: "Short Story", icon: "📝", desc: "Brief narratives" },
+    { value: "manuscript", label: "Manuscript", icon: "📄", desc: "General writing" },
+  ];
+
+  const templates = [
+    { value: "freeform", label: "Freeform", desc: "No structure" },
+    { value: "heros_journey", label: "Hero's Journey", desc: "12-stage arc" },
+    { value: "three_act", label: "Three Act", desc: "Classic structure" },
+    { value: "save_the_cat", label: "Save The Cat", desc: "Beat sheet" },
+    { value: "seven_point", label: "Seven Point", desc: "Plot structure" },
+  ];
+
   const genres = [
-    "Fiction",
-    "Fantasy",
-    "Mystery",
-    "Romance",
-    "Sci-Fi",
-    "Horror",
-    "Thriller",
-    "Literary",
-    "Other",
+    "Fiction", "Fantasy", "Mystery", "Romance", "Sci-Fi", 
+    "Horror", "Thriller", "Literary", "Historical", "Contemporary",
+    "Young Adult", "Adventure", "Drama", "Other"
   ];
 
   return (
@@ -115,11 +147,11 @@ const create = () => {
             </View>
 
             <Text className="text-4xl font-bold text-gray-900 mb-3 text-center">
-              Start Creating
+              Create Your Masterpiece
             </Text>
 
             <Text className="text-base text-gray-600 mb-8 text-center leading-6 px-4">
-              Begin your literary journey with a new project
+              Choose your format and start writing with powerful tools
             </Text>
           </Animated.View>
         </View>
@@ -127,56 +159,36 @@ const create = () => {
         {/* Project Type Selection */}
         <View className="px-6 mb-6">
           <Text className="text-2xl font-bold text-gray-900 mb-4">
-            What are you writing?
+            What are you creating?
           </Text>
-          <View className="flex-row gap-4">
-            <TouchableOpacity
-              onPress={() => setProjectType("novel")}
-              className={`flex-1 bg-white rounded-3xl p-6 shadow-lg active:opacity-80 ${
-                projectType === "novel" ? "border-4 border-primary" : ""
-              }`}
-              style={{
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.1,
-                shadowRadius: 8,
-                elevation: 4,
-              }}
-            >
-              <View className="w-12 h-12 rounded-xl bg-secondary justify-center items-center mb-3">
-                <Text className="text-3xl">📖</Text>
-              </View>
-              <Text className="text-xl font-bold text-gray-900 mb-1">
-                Novel
-              </Text>
-              <Text className="text-sm text-gray-600">
-                Long-form stories
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => setProjectType("poetry")}
-              className={`flex-1 bg-white rounded-3xl p-6 shadow-lg active:opacity-80 ${
-                projectType === "poetry" ? "border-4 border-primary" : ""
-              }`}
-              style={{
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.1,
-                shadowRadius: 8,
-                elevation: 4,
-              }}
-            >
-              <View className="w-12 h-12 rounded-xl bg-secondary justify-center items-center mb-3">
-                <Text className="text-3xl">✍️</Text>
-              </View>
-              <Text className="text-xl font-bold text-gray-900 mb-1">
-                Poetry
-              </Text>
-              <Text className="text-sm text-gray-600">
-                Verses & poems
-              </Text>
-            </TouchableOpacity>
+          <View className="flex-row flex-wrap gap-3">
+            {projectTypes.map((type) => (
+              <TouchableOpacity
+                key={type.value}
+                onPress={() => setProjectType(type.value as any)}
+                className={`bg-white rounded-3xl p-5 shadow-lg active:opacity-80 ${
+                  projectType === type.value ? "border-4 border-primary" : ""
+                }`}
+                style={{
+                  width: "48%",
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 8,
+                  elevation: 4,
+                }}
+              >
+                <View className="w-12 h-12 rounded-xl bg-secondary justify-center items-center mb-3">
+                  <Text className="text-3xl">{type.icon}</Text>
+                </View>
+                <Text className="text-lg font-bold text-gray-900 mb-1">
+                  {type.label}
+                </Text>
+                <Text className="text-xs text-gray-600">
+                  {type.desc}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
@@ -191,6 +203,20 @@ const create = () => {
               value={title}
               onChangeText={setTitle}
               placeholder="Enter your project title..."
+              placeholderTextColor="#9CA3AF"
+              className="bg-light-100 rounded-2xl px-4 py-4 text-gray-900 text-base"
+            />
+          </View>
+
+          {/* Author Name */}
+          <View className="bg-white rounded-3xl p-6 mb-4 shadow-lg">
+            <Text className="text-lg font-bold text-gray-900 mb-3">
+              Author Name
+            </Text>
+            <TextInput
+              value={authorName}
+              onChangeText={setAuthorName}
+              placeholder="Your name (optional)"
               placeholderTextColor="#9CA3AF"
               className="bg-light-100 rounded-2xl px-4 py-4 text-gray-900 text-base"
             />
@@ -215,7 +241,7 @@ const create = () => {
           </View>
 
           {/* Genre Selection */}
-          <View className="bg-white rounded-3xl p-6 mb-6 shadow-lg">
+          <View className="bg-white rounded-3xl p-6 mb-4 shadow-lg">
             <Text className="text-lg font-bold text-gray-900 mb-4">
               Choose a Genre
             </Text>
@@ -225,9 +251,7 @@ const create = () => {
                   key={g}
                   onPress={() => setGenre(g)}
                   className={`px-5 py-3 rounded-full active:opacity-80 ${
-                    genre === g
-                      ? "bg-primary"
-                      : "bg-light-100"
+                    genre === g ? "bg-primary" : "bg-light-100"
                   }`}
                 >
                   <Text
@@ -241,13 +265,69 @@ const create = () => {
               ))}
             </View>
           </View>
+
+          {/* Writing Template (only for novels) */}
+          {projectType === "novel" && (
+            <View className="bg-white rounded-3xl p-6 mb-4 shadow-lg">
+              <Text className="text-lg font-bold text-gray-900 mb-4">
+                Writing Structure
+              </Text>
+              <View className="gap-3">
+                {templates.map((template) => (
+                  <TouchableOpacity
+                    key={template.value}
+                    onPress={() => setWritingTemplate(template.value)}
+                    className={`p-4 rounded-2xl border-2 ${
+                      writingTemplate === template.value
+                        ? "border-primary bg-primary/10"
+                        : "border-light-100 bg-light-100"
+                    }`}
+                  >
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-1">
+                        <Text className="text-base font-bold text-gray-900 mb-1">
+                          {template.label}
+                        </Text>
+                        <Text className="text-sm text-gray-600">
+                          {template.desc}
+                        </Text>
+                      </View>
+                      {writingTemplate === template.value && (
+                        <View className="w-6 h-6 rounded-full bg-primary justify-center items-center">
+                          <Text className="text-white text-xs">✓</Text>
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Target Word Count */}
+          <View className="bg-white rounded-3xl p-6 mb-6 shadow-lg">
+            <Text className="text-lg font-bold text-gray-900 mb-3">
+              Target Word Count
+            </Text>
+            <TextInput
+              value={targetWordCount}
+              onChangeText={setTargetWordCount}
+              placeholder="e.g., 50000"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="numeric"
+              className="bg-light-100 rounded-2xl px-4 py-4 text-gray-900 text-base"
+            />
+            <Text className="text-xs text-gray-500 mt-2">
+              Set a goal to track your progress
+            </Text>
+          </View>
         </View>
 
         {/* Action Buttons */}
         <View className="px-6">
           <TouchableOpacity
             onPress={handleCreateProject}
-            className="bg-secondary px-8 py-4 rounded-full active:opacity-80 mb-4"
+            className="bg-secondary px-8 py-5 rounded-full active:opacity-80 mb-4"
             style={{
               shadowColor: "#FFC2C7",
               shadowOffset: { width: 0, height: 8 },
@@ -256,18 +336,13 @@ const create = () => {
               elevation: 8,
             }}
           >
-            <Text className="text-gray-900 font-bold text-base text-center">
-              Create Project
+            <Text className="text-gray-900 font-bold text-lg text-center">
+              🚀 Create Project
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => {
-              setProjectType(null);
-              setTitle("");
-              setDescription("");
-              setGenre("");
-            }}
+            onPress={() => router.back()}
             className="py-3 active:opacity-60"
           >
             <Text className="text-gray-600 text-base text-center font-semibold">
