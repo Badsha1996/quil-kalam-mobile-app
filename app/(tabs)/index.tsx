@@ -1,6 +1,7 @@
 import Background from "@/components/common/Background";
 import FeatureCard from "@/components/index/FeatureCard";
 import StatCard from "@/components/index/StatCard";
+import React from "react";
 import { useEffect, useRef } from "react";
 import {
   Animated,
