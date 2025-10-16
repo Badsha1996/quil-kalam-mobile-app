@@ -1,6 +1,5 @@
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { Animated, Text, View } from "react-native";
-
 type FeatureCardProps = {
   icon: React.ReactNode;
   title: string;
@@ -31,7 +30,7 @@ const FeatureCard = ({ icon, title, description, delay }: FeatureCardProps) => {
 
   return (
     <Animated.View
-      className="bg-white rounded-3xl p-6 mb-4 shadow-lg"
+      className="bg-white dark:bg-gray-800 rounded-3xl p-6 mb-4 shadow-lg"
       style={{
         opacity: fadeAnim,
         transform: [{ translateY }],
@@ -41,9 +40,9 @@ const FeatureCard = ({ icon, title, description, delay }: FeatureCardProps) => {
         <View className="w-12 h-12 rounded-xl bg-primary justify-center items-center mr-4">
           <Text className="text-2xl">{icon}</Text>
         </View>
-        <Text className="text-lg font-bold text-gray-900 flex-1">{title}</Text>
+        <Text className="text-lg font-bold text-gray-900 dark:text-white flex-1">{title}</Text>
       </View>
-      <Text className="text-sm text-gray-600 leading-5">{description}</Text>
+      <Text className="text-sm text-gray-600 dark:text-white leading-5">{description}</Text>
     </Animated.View>
   );
 };
