@@ -1,6 +1,6 @@
 const projectTypes = [
   { value: "novel", label: "Novel", icon: "📖", desc: "Long-form fiction" },
-  { value: "poetry", label: "Poetry", icon: "✍️", desc: "Verses & poems" },
+  { value: "poetry", label: "Poetry", icon: "✍🏻", desc: "Verses & poems" },
   {
     value: "shortStory",
     label: "Short Story",
