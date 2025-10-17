@@ -180,7 +180,7 @@ const create = () => {
                     boxShadow: "rgba(100, 100, 111, 0.2) 0px 7px 29px 0px",
                   }}
                 >
-                  <View className="w-12 h-12 rounded-xl bg-secondary justify-center items-center mb-3">
+                  <View className="w-12 h-12 rounded-xl bg-primary justify-center items-center mb-3">
                     <Text className="text-3xl">{type.icon}</Text>
                   </View>
                   <Text className="text-lg font-bold text-dark-300 dark:text-light-100  mb-1">

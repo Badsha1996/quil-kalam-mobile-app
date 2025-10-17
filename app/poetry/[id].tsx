@@ -1,30 +1,29 @@
 import Background from "@/components/common/Background";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import React, { useState, useEffect, useRef } from "react";
 import {
+  createFile,
+  createFolder,
+  deleteFile,
+  deleteFolder,
+  exportProjectAsJSON,
+  getFilesByProject,
+  getFoldersByProject,
+  getProject,
+  getProjectStats,
+  updateFile,
+  updateProject,
+} from "@/utils/database";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Alert,
   Animated,
+  Modal,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  Alert,
-  Modal,
 } from "react-native";
-import {
-  getProject,
-  updateProject,
-  deleteProject,
-  getProjectStats,
-  getFoldersByProject,
-  getFilesByProject,
-  createFolder,
-  createFile,
-  updateFile,
-  deleteFile,
-  deleteFolder,
-  exportProjectAsJSON,
-} from "@/utils/database";
 
 const PoetryDetails = () => {
   const router = useRouter();
@@ -35,12 +34,14 @@ const PoetryDetails = () => {
   const [stats, setStats] = useState<any>(null);
   const [folders, setFolders] = useState<any[]>([]);
   const [poems, setPoems] = useState<any[]>([]);
-  
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingPoem, setEditingPoem] = useState<any>(null);
   const [newPoemTitle, setNewPoemTitle] = useState("");
   const [newPoemContent, setNewPoemContent] = useState("");
-  const [selectedCollection, setSelectedCollection] = useState<number | null>(null);
+  const [selectedCollection, setSelectedCollection] = useState<number | null>(
+    null
+  );
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -80,7 +81,7 @@ const PoetryDetails = () => {
         content: newPoemContent,
         orderIndex: poems.length,
       });
-      
+
       setShowAddModal(false);
       setNewPoemTitle("");
       setNewPoemContent("");
@@ -92,21 +93,17 @@ const PoetryDetails = () => {
   };
 
   const handleAddCollection = () => {
-    Alert.prompt(
-      "New Collection",
-      "Enter collection name",
-      (text) => {
-        if (text.trim()) {
-          createFolder({
-            projectId,
-            name: text,
-            folderType: "section",
-            orderIndex: folders.length,
-          });
-          loadProjectData();
-        }
+    Alert.prompt("New Collection", "Enter collection name", (text) => {
+      if (text.trim()) {
+        createFolder({
+          projectId,
+          name: text,
+          folderType: "section",
+          orderIndex: folders.length,
+        });
+        loadProjectData();
       }
-    );
+    });
   };
 
   const handleEditPoem = (poem: any) => {
@@ -129,39 +126,31 @@ const PoetryDetails = () => {
   };
 
   const handleDeletePoem = (id: number, title: string) => {
-    Alert.alert(
-      "Delete Poem",
-      `Delete "${title}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            deleteFile(id);
-            loadProjectData();
-          },
+    Alert.alert("Delete Poem", `Delete "${title}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          deleteFile(id);
+          loadProjectData();
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleDeleteCollection = (id: number, name: string) => {
-    Alert.alert(
-      "Delete Collection",
-      `Delete "${name}" and all its poems?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            deleteFolder(id);
-            loadProjectData();
-          },
+    Alert.alert("Delete Collection", `Delete "${name}" and all its poems?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          deleteFolder(id);
+          loadProjectData();
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleExport = () => {
@@ -177,29 +166,37 @@ const PoetryDetails = () => {
   };
 
   const handleUpdateStatus = () => {
-    const statuses = ["draft", "in_progress", "revision", "complete", "published"];
+    const statuses = [
+      "draft",
+      "in_progress",
+      "revision",
+      "complete",
+      "published",
+    ];
     const currentIndex = statuses.indexOf(project.status);
     const nextStatus = statuses[(currentIndex + 1) % statuses.length];
-    
+
     updateProject(projectId, { status: nextStatus });
     loadProjectData();
   };
 
   const countLines = (text: string) => {
     if (!text) return 0;
-    return text.split('\n').filter(line => line.trim()).length;
+    return text.split("\n").filter((line) => line.trim()).length;
   };
 
   const countStanzas = (text: string) => {
     if (!text) return 0;
-    return text.split(/\n\s*\n/).filter(stanza => stanza.trim()).length;
+    return text.split(/\n\s*\n/).filter((stanza) => stanza.trim()).length;
   };
 
   if (!project) {
     return (
       <Background>
         <View className="flex-1 justify-center items-center">
-          <Text className="text-xl text-gray-600">Loading...</Text>
+          <Text className="text-xl text-gray-600 dark:text-light-200">
+            Loading...
+          </Text>
         </View>
       </Background>
     );
@@ -217,22 +214,22 @@ const PoetryDetails = () => {
           <View className="px-6 pt-16 pb-6">
             <TouchableOpacity
               onPress={() => router.back()}
-              className="mb-4 w-10 h-10 rounded-full bg-white justify-center items-center"
+              className="mb-4 w-10 h-10 rounded-full bg-white dark:bg-dark-200 justify-center items-center shadow-lg"
             >
-              <Text className="text-xl">←</Text>
+              <Text className="text-xl dark:text-light-100">←</Text>
             </TouchableOpacity>
 
-            <View className="bg-white rounded-3xl p-6 shadow-lg mb-4">
+            <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 shadow-lg mb-4">
               <View className="flex-row items-start mb-4">
                 <View className="w-16 h-16 rounded-2xl bg-secondary justify-center items-center mr-4">
                   <Text className="text-4xl">✍️</Text>
                 </View>
                 <View className="flex-1">
-                  <Text className="text-2xl font-bold text-gray-900 mb-2">
+                  <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-2">
                     {project.title}
                   </Text>
                   {project.author_name && (
-                    <Text className="text-sm text-gray-600 mb-2">
+                    <Text className="text-sm text-gray-600 dark:text-light-200 mb-2">
                       by {project.author_name}
                     </Text>
                   )}
@@ -241,13 +238,13 @@ const PoetryDetails = () => {
                       onPress={handleUpdateStatus}
                       className="bg-primary px-3 py-1 rounded-full"
                     >
-                      <Text className="text-white text-xs font-bold">
-                        {project.status.replace('_', ' ').toUpperCase()}
+                      <Text className="text-white dark:text-dark-100 text-xs font-bold">
+                        {project.status.replace("_", " ").toUpperCase()}
                       </Text>
                     </TouchableOpacity>
                     {project.genre && (
-                      <View className="bg-light-100 px-3 py-1 rounded-full">
-                        <Text className="text-gray-600 text-xs font-semibold">
+                      <View className="bg-light-100 dark:bg-dark-100 px-3 py-1 rounded-full">
+                        <Text className="text-gray-600 dark:text-light-200 text-xs font-semibold">
                           {project.genre}
                         </Text>
                       </View>
@@ -257,35 +254,45 @@ const PoetryDetails = () => {
               </View>
 
               {project.description && (
-                <Text className="text-sm text-gray-600 italic mb-4">
+                <Text className="text-sm text-gray-600 dark:text-light-200 italic mb-4">
                   "{project.description}"
                 </Text>
               )}
 
               {/* Stats Grid */}
               <View className="flex-row flex-wrap gap-3 mb-4">
-                <View className="bg-light-100 rounded-2xl p-3 flex-1 min-w-[45%]">
-                  <Text className="text-xs text-gray-600 mb-1">Total Poems</Text>
-                  <Text className="text-xl font-bold text-gray-900">
+                <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-3 flex-1 min-w-[45%]">
+                  <Text className="text-xs text-gray-600 dark:text-light-200 mb-1">
+                    Total Poems
+                  </Text>
+                  <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
                     {poems.length}
                   </Text>
                 </View>
-                <View className="bg-light-100 rounded-2xl p-3 flex-1 min-w-[45%]">
-                  <Text className="text-xs text-gray-600 mb-1">Collections</Text>
-                  <Text className="text-xl font-bold text-gray-900">
+                <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-3 flex-1 min-w-[45%]">
+                  <Text className="text-xs text-gray-600 dark:text-light-200 mb-1">
+                    Collections
+                  </Text>
+                  <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
                     {folders.length}
                   </Text>
                 </View>
-                <View className="bg-light-100 rounded-2xl p-3 flex-1 min-w-[45%]">
-                  <Text className="text-xs text-gray-600 mb-1">Total Words</Text>
-                  <Text className="text-xl font-bold text-gray-900">
+                <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-3 flex-1 min-w-[45%]">
+                  <Text className="text-xs text-gray-600 dark:text-light-200 mb-1">
+                    Total Words
+                  </Text>
+                  <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
                     {stats?.wordCount?.toLocaleString() || 0}
                   </Text>
                 </View>
-                <View className="bg-light-100 rounded-2xl p-3 flex-1 min-w-[45%]">
-                  <Text className="text-xs text-gray-600 mb-1">Avg per Poem</Text>
-                  <Text className="text-xl font-bold text-gray-900">
-                    {poems.length > 0 ? Math.round((stats?.wordCount || 0) / poems.length) : 0}
+                <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-3 flex-1 min-w-[45%]">
+                  <Text className="text-xs text-gray-600 dark:text-light-200 mb-1">
+                    Avg per Poem
+                  </Text>
+                  <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
+                    {poems.length > 0
+                      ? Math.round((stats?.wordCount || 0) / poems.length)
+                      : 0}
                   </Text>
                 </View>
               </View>
@@ -295,25 +302,25 @@ const PoetryDetails = () => {
             <View className="flex-row gap-3 mb-6">
               <TouchableOpacity
                 onPress={() => setShowAddModal(true)}
-                className="flex-1 bg-secondary py-4 rounded-2xl"
+                className="flex-1 bg-secondary py-4 rounded-2xl shadow-lg"
               >
-                <Text className="text-gray-900 font-bold text-center">
+                <Text className="text-gray-900 dark:text-dark-300 font-bold text-center">
                   ✨ New Poem
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleAddCollection}
-                className="bg-white py-4 px-6 rounded-2xl border-2 border-primary"
+                className="bg-white dark:bg-dark-200 py-4 px-6 rounded-2xl border-2 border-primary shadow-lg"
               >
-                <Text className="text-primary font-bold text-center">
+                <Text className="text-primary font-bold text-center text-xl">
                   📚
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleExport}
-                className="bg-white py-4 px-6 rounded-2xl border-2 border-primary"
+                className="bg-white dark:bg-dark-200 py-4 px-6 rounded-2xl border-2 border-primary shadow-lg"
               >
-                <Text className="text-primary font-bold text-center">
+                <Text className="text-primary font-bold text-center text-xl">
                   📤
                 </Text>
               </TouchableOpacity>
@@ -323,16 +330,20 @@ const PoetryDetails = () => {
           {/* Collections */}
           {folders.length > 0 && (
             <View className="px-6 mb-6">
-              <Text className="text-xl font-bold text-gray-900 mb-3">
+              <Text className="text-xl font-bold text-gray-900 dark:text-light-100 mb-3">
                 Collections
               </Text>
               {folders.map((collection) => {
-                const collectionPoems = poems.filter(p => p.folder_id === collection.id);
+                const collectionPoems = poems.filter(
+                  (p) => p.folder_id === collection.id
+                );
                 return (
                   <TouchableOpacity
                     key={collection.id}
-                    onLongPress={() => handleDeleteCollection(collection.id, collection.name)}
-                    className="bg-white rounded-2xl p-4 mb-3 shadow-lg"
+                    onLongPress={() =>
+                      handleDeleteCollection(collection.id, collection.name)
+                    }
+                    className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-3 shadow-lg active:opacity-80"
                   >
                     <View className="flex-row items-center justify-between">
                       <View className="flex-row items-center flex-1">
@@ -340,15 +351,18 @@ const PoetryDetails = () => {
                           <Text className="text-2xl">📚</Text>
                         </View>
                         <View className="flex-1">
-                          <Text className="text-lg font-bold text-gray-900">
+                          <Text className="text-lg font-bold text-gray-900 dark:text-light-100">
                             {collection.name}
                           </Text>
-                          <Text className="text-xs text-gray-500">
-                            {collectionPoems.length} {collectionPoems.length === 1 ? 'poem' : 'poems'}
+                          <Text className="text-xs text-gray-500 dark:text-light-200">
+                            {collectionPoems.length}{" "}
+                            {collectionPoems.length === 1 ? "poem" : "poems"}
                           </Text>
                         </View>
                       </View>
-                      <Text className="text-gray-400 text-xl">›</Text>
+                      <Text className="text-gray-400 dark:text-light-200 text-xl">
+                        ›
+                      </Text>
                     </View>
                   </TouchableOpacity>
                 );
@@ -365,7 +379,7 @@ const PoetryDetails = () => {
               poems.map((poem, index) => {
                 const lines = countLines(poem.content);
                 const stanzas = countStanzas(poem.content);
-                
+
                 return (
                   <TouchableOpacity
                     key={poem.id}
@@ -398,10 +412,10 @@ const PoetryDetails = () => {
                         </Text>
                       </View>
                     </View>
-                    
+
                     {poem.content && (
                       <View className="bg-light-100 rounded-xl p-3">
-                        <Text 
+                        <Text
                           className="text-sm text-gray-700 italic leading-5 font-serif"
                           numberOfLines={4}
                         >
@@ -425,9 +439,7 @@ const PoetryDetails = () => {
                   onPress={() => setShowAddModal(true)}
                   className="bg-secondary px-6 py-3 rounded-full"
                 >
-                  <Text className="text-gray-900 font-bold">
-                    ✨ Write Poem
-                  </Text>
+                  <Text className="text-gray-900 font-bold">✨ Write Poem</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -443,7 +455,10 @@ const PoetryDetails = () => {
         onRequestClose={() => setShowAddModal(false)}
       >
         <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white rounded-t-3xl p-6" style={{ maxHeight: '90%' }}>
+          <View
+            className="bg-white rounded-t-3xl p-6"
+            style={{ maxHeight: "90%" }}
+          >
             <Text className="text-2xl font-bold text-gray-900 mb-4">
               ✨ New Poem
             </Text>
@@ -493,12 +508,16 @@ const PoetryDetails = () => {
                         key={folder.id}
                         onPress={() => setSelectedCollection(folder.id)}
                         className={`px-4 py-2 rounded-full ${
-                          selectedCollection === folder.id ? "bg-primary" : "bg-light-100"
+                          selectedCollection === folder.id
+                            ? "bg-primary"
+                            : "bg-light-100"
                         }`}
                       >
                         <Text
                           className={`text-sm font-semibold ${
-                            selectedCollection === folder.id ? "text-white" : "text-gray-600"
+                            selectedCollection === folder.id
+                              ? "text-white"
+                              : "text-gray-600"
                           }`}
                         >
                           {folder.name}
@@ -583,10 +602,7 @@ const PoetryDetails = () => {
               className="bg-light-100 rounded-2xl px-4 py-4 mb-4 text-gray-900 text-xl font-bold"
             />
 
-            <ScrollView
-              className="flex-1"
-              showsVerticalScrollIndicator={false}
-            >
+            <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
               <TextInput
                 value={editingPoem?.content}
                 onChangeText={(text) =>
@@ -602,13 +618,15 @@ const PoetryDetails = () => {
               <View className="bg-light-100 rounded-2xl p-4 mt-4">
                 <View className="flex-row justify-between">
                   <Text className="text-sm text-gray-600">
-                    Words: {editingPoem?.content?.trim().split(/\s+/).filter(Boolean).length || 0}
+                    Words:{" "}
+                    {editingPoem?.content?.trim().split(/\s+/).filter(Boolean)
+                      .length || 0}
                   </Text>
                   <Text className="text-sm text-gray-600">
-                    Lines: {countLines(editingPoem?.content || '')}
+                    Lines: {countLines(editingPoem?.content || "")}
                   </Text>
                   <Text className="text-sm text-gray-600">
-                    Stanzas: {countStanzas(editingPoem?.content || '')}
+                    Stanzas: {countStanzas(editingPoem?.content || "")}
                   </Text>
                 </View>
               </View>

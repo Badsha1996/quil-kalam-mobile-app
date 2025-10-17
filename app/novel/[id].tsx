@@ -23,7 +23,9 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -50,14 +52,18 @@ const NovelDetails = () => {
   >("content");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+  const [currentFolder, setCurrentFolder] = useState<number | null>(null);
+  const [folderPath, setFolderPath] = useState<any[]>([]);
+  const [isHeaderMinimized, setIsHeaderMinimized] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
 
   // Form states
   const [newItemName, setNewItemName] = useState("");
   const [newItemContent, setNewItemContent] = useState("");
   const [newItemType, setNewItemType] = useState<"folder" | "file">("file");
-  const [selectedFolder, setSelectedFolder] = useState<number | null>(null);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const headerHeight = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     loadProjectData();
@@ -88,6 +94,25 @@ const NovelDetails = () => {
     setPublishingSettingsState(publishData);
   };
 
+  const toggleHeaderMinimize = () => {
+    const toValue = isHeaderMinimized ? 1 : 0;
+    setIsHeaderMinimized(!isHeaderMinimized);
+
+    Animated.timing(headerHeight, {
+      toValue,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const getCurrentFolderItems = () => {
+    const currentFolders = folders.filter(
+      (f) => f.parent_folder_id === currentFolder
+    );
+    const currentFiles = files.filter((f) => f.folder_id === currentFolder);
+    return { folders: currentFolders, files: currentFiles };
+  };
+
   const handleAddItem = () => {
     if (!newItemName.trim()) {
       Alert.alert("Error", "Please enter a name");
@@ -98,6 +123,7 @@ const NovelDetails = () => {
       if (newItemType === "folder") {
         createFolder({
           projectId,
+          parentFolderId: currentFolder || undefined,
           name: newItemName,
           folderType: "chapter",
           orderIndex: folders.length,
@@ -105,7 +131,7 @@ const NovelDetails = () => {
       } else {
         createFile({
           projectId,
-          folderId: selectedFolder || undefined,
+          folderId: currentFolder || undefined,
           fileType: "document",
           name: newItemName,
           content: newItemContent,
@@ -116,10 +142,25 @@ const NovelDetails = () => {
       setShowAddModal(false);
       setNewItemName("");
       setNewItemContent("");
-      setSelectedFolder(null);
       loadProjectData();
     } catch (error) {
       Alert.alert("Error", "Failed to create item");
+    }
+  };
+
+  const handleFolderClick = (folder: any) => {
+    setCurrentFolder(folder.id);
+    setFolderPath([...folderPath, folder]);
+  };
+
+  const handleBackClick = () => {
+    if (folderPath.length > 0) {
+      const newPath = [...folderPath];
+      newPath.pop();
+      setFolderPath(newPath);
+      setCurrentFolder(
+        newPath.length > 0 ? newPath[newPath.length - 1].id : null
+      );
     }
   };
 
@@ -170,7 +211,7 @@ const NovelDetails = () => {
 
   const handleAddCharacter = () => {
     Alert.prompt("Add Character", "Enter character name", (text) => {
-      if (text.trim()) {
+      if (text && text.trim()) {
         createCharacter(projectId, { name: text });
         loadProjectData();
       }
@@ -179,7 +220,7 @@ const NovelDetails = () => {
 
   const handleAddLocation = () => {
     Alert.prompt("Add Location", "Enter location name", (text) => {
-      if (text.trim()) {
+      if (text && text.trim()) {
         createLocation(projectId, { name: text });
         loadProjectData();
       }
@@ -191,7 +232,6 @@ const NovelDetails = () => {
       const jsonData = exportProjectAsJSON(projectId);
       if (jsonData) {
         Alert.alert("Export Ready", "Project exported successfully!");
-        // In a real app, you'd save this to a file or share it
         console.log("Exported data:", jsonData);
       }
     } catch (error) {
@@ -218,7 +258,9 @@ const NovelDetails = () => {
     return (
       <Background>
         <View className="flex-1 justify-center items-center">
-          <Text className="text-xl text-gray-600">Loading...</Text>
+          <Text className="text-xl text-gray-600 dark:text-light-200">
+            Loading...
+          </Text>
         </View>
       </Background>
     );
@@ -228,6 +270,9 @@ const NovelDetails = () => {
     ? (stats.wordCount / stats.targetWordCount) * 100
     : 0;
 
+  const { folders: currentFolders, files: currentFiles } =
+    getCurrentFolderItems();
+
   return (
     <Background>
       <ScrollView
@@ -236,127 +281,151 @@ const NovelDetails = () => {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View style={{ opacity: fadeAnim }}>
-          {/* Header */}
-          <View className="px-6 pt-16 pb-6">
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="mb-4 w-10 h-10 rounded-full bg-white justify-center items-center"
-            >
-              <Text className="text-xl">←</Text>
-            </TouchableOpacity>
-
-            <View className="bg-white rounded-3xl p-6 shadow-lg mb-4">
-              <View className="flex-row items-start mb-4">
-                <View className="w-16 h-16 rounded-2xl bg-secondary justify-center items-center mr-4">
-                  <Text className="text-4xl">📖</Text>
-                </View>
-                <View className="flex-1">
-                  <Text className="text-2xl font-bold text-gray-900 mb-2">
-                    {project.title}
+          {/* Minimizable Header */}
+          <Animated.View
+            style={{
+              height: headerHeight.interpolate({
+                inputRange: [0, 1],
+                outputRange: [80, 500],
+              }),
+              marginBottom: 20,
+            }}
+          >
+            <View className="px-6 pt-16 pb-6">
+              <View className="flex-row justify-between items-center mb-4">
+                <TouchableOpacity
+                  onPress={() => router.back()}
+                  className="w-10 h-10 rounded-full bg-white dark:bg-dark-200 justify-center items-center shadow-lg"
+                >
+                  <Text className="text-xl dark:text-light-100">←</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={toggleHeaderMinimize}
+                  className="w-10 h-10 rounded-full bg-white dark:bg-dark-200 justify-center items-center shadow-lg"
+                >
+                  <Text className="text-xl dark:text-light-100">
+                    {isHeaderMinimized ? "▼" : "▲"}
                   </Text>
-                  {project.author_name && (
-                    <Text className="text-sm text-gray-600 mb-2">
-                      by {project.author_name}
-                    </Text>
-                  )}
-                  <View className="flex-row gap-2 flex-wrap">
-                    <TouchableOpacity
-                      onPress={handleUpdateStatus}
-                      className="bg-primary px-3 py-1 rounded-full"
-                    >
-                      <Text className="text-white text-xs font-bold">
-                        {project.status.replace("_", " ").toUpperCase()}
-                      </Text>
-                    </TouchableOpacity>
-                    {project.genre && (
-                      <View className="bg-light-100 px-3 py-1 rounded-full">
-                        <Text className="text-gray-600 text-xs font-semibold">
-                          {project.genre}
+                </TouchableOpacity>
+              </View>
+
+              {!isHeaderMinimized && (
+                <>
+                  <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 shadow-lg mb-4">
+                    <View className="flex-row items-start mb-4">
+                      <View className="w-16 h-16 rounded-xl bg-secondary dark:bg-transparent justify-center items-center mr-4">
+                        <Text className="text-4xl">📖</Text>
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-2">
+                          {project.title}
                         </Text>
+                        {project.author_name && (
+                          <Text className="text-sm text-gray-600 dark:text-light-200 mb-2">
+                            by {project.author_name}
+                          </Text>
+                        )}
+                        <View className="flex-row gap-2 flex-wrap">
+                          <TouchableOpacity
+                            onPress={handleUpdateStatus}
+                            className="bg-primary px-3 py-1 rounded-full"
+                          >
+                            <Text className="text-white dark:text-dark-100 text-xs font-bold">
+                              {project.status.replace("_", " ").toUpperCase()}
+                            </Text>
+                          </TouchableOpacity>
+                          {project.genre && (
+                            <View className="bg-light-100 dark:bg-dark-100 px-3 py-1 rounded-full">
+                              <Text className="text-gray-600 dark:text-light-200 text-xs font-semibold">
+                                {project.genre}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+
+                    {project.description && (
+                      <Text className="text-sm text-gray-600 dark:text-light-200 mb-4">
+                        {project.description}
+                      </Text>
+                    )}
+
+                    {/* Stats Grid */}
+                    <View className="flex-row flex-wrap gap-3 mb-4">
+                      <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-3 flex-1 min-w-[45%]">
+                        <Text className="text-xs text-gray-600 dark:text-light-200 mb-1">
+                          Chapters
+                        </Text>
+                        <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
+                          {stats?.folderCount || 0}
+                        </Text>
+                      </View>
+                      <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-3 flex-1 min-w-[45%]">
+                        <Text className="text-xs text-gray-600 dark:text-light-200 mb-1">
+                          Files
+                        </Text>
+                        <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
+                          {stats?.fileCount || 0}
+                        </Text>
+                      </View>
+                      <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-3 flex-1 min-w-[45%]">
+                        <Text className="text-xs text-gray-600 dark:text-light-200 mb-1">
+                          Characters
+                        </Text>
+                        <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
+                          {stats?.characterCount || 0}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Progress Bar */}
+                    {project.target_word_count > 0 && (
+                      <View>
+                        <View className="flex-row justify-between mb-2">
+                          <Text className="text-sm font-semibold text-gray-700 dark:text-light-100">
+                            Progress: {progress.toFixed(1)}%
+                          </Text>
+                          <Text className="text-sm text-gray-600 dark:text-light-200">
+                            Target: {project.target_word_count.toLocaleString()}
+                          </Text>
+                        </View>
+                        <View className="h-3 bg-light-100 dark:bg-dark-100 rounded-full overflow-hidden">
+                          <View
+                            className="h-full bg-primary rounded-full"
+                            style={{ width: `${Math.min(progress, 100)}%` }}
+                          />
+                        </View>
                       </View>
                     )}
                   </View>
-                </View>
-              </View>
 
-              {project.description && (
-                <Text className="text-sm text-gray-600 mb-4">
-                  {project.description}
-                </Text>
-              )}
-
-              {/* Stats Grid */}
-              <View className="flex-row flex-wrap gap-3 mb-4">
-                <View className="bg-light-100 rounded-2xl p-3 flex-1 min-w-[45%]">
-                  <Text className="text-xs text-gray-600 mb-1">Word Count</Text>
-                  <Text className="text-xl font-bold text-gray-900">
-                    {stats?.wordCount?.toLocaleString() || 0}
-                  </Text>
-                </View>
-                <View className="bg-light-100 rounded-2xl p-3 flex-1 min-w-[45%]">
-                  <Text className="text-xs text-gray-600 mb-1">Chapters</Text>
-                  <Text className="text-xl font-bold text-gray-900">
-                    {stats?.folderCount || 0}
-                  </Text>
-                </View>
-                <View className="bg-light-100 rounded-2xl p-3 flex-1 min-w-[45%]">
-                  <Text className="text-xs text-gray-600 mb-1">Files</Text>
-                  <Text className="text-xl font-bold text-gray-900">
-                    {stats?.fileCount || 0}
-                  </Text>
-                </View>
-                <View className="bg-light-100 rounded-2xl p-3 flex-1 min-w-[45%]">
-                  <Text className="text-xs text-gray-600 mb-1">Characters</Text>
-                  <Text className="text-xl font-bold text-gray-900">
-                    {stats?.characterCount || 0}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Progress Bar */}
-              {project.target_word_count > 0 && (
-                <View>
-                  <View className="flex-row justify-between mb-2">
-                    <Text className="text-sm font-semibold text-gray-700">
-                      Progress: {progress.toFixed(1)}%
-                    </Text>
-                    <Text className="text-sm text-gray-600">
-                      Target: {project.target_word_count.toLocaleString()}
-                    </Text>
+                  {/* Action Buttons */}
+                  <View className="flex-row gap-3 mb-10">
+                    <TouchableOpacity
+                      onPress={() => setShowAddModal(true)}
+                      className="flex-1 bg-secondary py-4 rounded-2xl shadow-lg"
+                    >
+                      <Text className="text-gray-900 dark:text-dark-300 font-bold text-center">
+                        ➕ Add Content
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleExport}
+                      className="bg-white dark:bg-dark-200 py-4 px-6 rounded-2xl border-2 border-primary shadow-lg"
+                    >
+                      <Text className="text-primary font-bold text-center">
+                        📤
+                      </Text>
+                    </TouchableOpacity>
                   </View>
-                  <View className="h-3 bg-light-100 rounded-full overflow-hidden">
-                    <View
-                      className="h-full bg-primary rounded-full"
-                      style={{ width: `${Math.min(progress, 100)}%` }}
-                    />
-                  </View>
-                </View>
+                </>
               )}
             </View>
-
-            {/* Action Buttons */}
-            <View className="flex-row gap-3 mb-6">
-              <TouchableOpacity
-                onPress={() => setShowAddModal(true)}
-                className="flex-1 bg-secondary py-4 rounded-2xl"
-              >
-                <Text className="text-gray-900 font-bold text-center">
-                  ➕ Add Content
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleExport}
-                className="bg-white py-4 px-6 rounded-2xl border-2 border-primary"
-              >
-                <Text className="text-primary font-bold text-center">
-                  📤 Export
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          </Animated.View>
 
           {/* Tabs */}
-          <View className="px-6 mb-4">
+          <View className="p-6 mb-4">
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View className="flex-row gap-2">
                 {[
@@ -372,12 +441,16 @@ const NovelDetails = () => {
                     key={tab.key}
                     onPress={() => setActiveTab(tab.key as any)}
                     className={`px-5 py-3 rounded-full ${
-                      activeTab === tab.key ? "bg-primary" : "bg-white"
+                      activeTab === tab.key
+                        ? "bg-primary"
+                        : "bg-white dark:bg-dark-200"
                     }`}
                   >
                     <Text
                       className={`text-sm font-bold ${
-                        activeTab === tab.key ? "text-white" : "text-gray-600"
+                        activeTab === tab.key
+                          ? "text-white dark:text-dark-100"
+                          : "text-gray-600 dark:text-light-200"
                       }`}
                     >
                       {tab.icon} {tab.label}
@@ -392,32 +465,90 @@ const NovelDetails = () => {
           <View className="px-6">
             {activeTab === "content" && (
               <View>
-                {/* Folders */}
-                {folders.length > 0 && (
+                {/* Breadcrumb Navigation */}
+                {folderPath.length > 0 && (
                   <View className="mb-4">
-                    <Text className="text-xl font-bold text-gray-900 mb-3">
-                      Chapters & Sections
+                    {/* <TouchableOpacity
+                      onPress={handleBackClick}
+                      className="flex-row items-center mb-2"
+                    >
+                      <Text className="text-primary text-xl font-bold">
+                        Back
+                      </Text>
+                    </TouchableOpacity> */}
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                    >
+                      <View className="flex-row items-center gap-2">
+                        <TouchableOpacity
+                          onPress={() => {
+                            setCurrentFolder(null);
+                            setFolderPath([]);
+                          }}
+                        >
+                          <Text className="text-gray-600 text-3xl dark:text-light-200 font-semibold">
+                            Root
+                          </Text>
+                        </TouchableOpacity>
+                        {folderPath.map((folder, index) => (
+                          <View
+                            key={folder.id}
+                            className="flex-row items-center gap-2"
+                          >
+                            <Text className="text-gray-400 text-3xl dark:text-light-200">
+                              ›
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => {
+                                const newPath = folderPath.slice(0, index + 1);
+                                setFolderPath(newPath);
+                                setCurrentFolder(folder.id);
+                              }}
+                            >
+                              <Text className="text-gray-600 text-3xl dark:text-light-200 font-semibold">
+                                {folder.name}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </View>
+                )}
+
+                {/* Folders */}
+                {currentFolders.length > 0 && (
+                  <View className="mb-4">
+                    <Text className="text-xl font-bold text-gray-900 dark:text-light-100 mb-3">
+                      Folders
                     </Text>
-                    {folders.map((folder) => (
+                    {currentFolders.map((folder) => (
                       <TouchableOpacity
                         key={folder.id}
+                        onPress={() => handleFolderClick(folder)}
                         onLongPress={() =>
                           handleDeleteItem("folder", folder.id, folder.name)
                         }
-                        className="bg-white rounded-2xl p-4 mb-3 shadow-lg"
+                        className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-3 shadow-lg"
                       >
-                        <View className="flex-row items-center">
-                          <View className="w-10 h-10 rounded-xl bg-secondary justify-center items-center mr-3">
-                            <Text className="text-xl">📁</Text>
+                        <View className="flex-row items-center justify-between">
+                          <View className="flex-row items-center flex-1">
+                            <View className="w-10 h-10 rounded-xl  justify-center items-center mr-3">
+                              <Text className="text-3xl">📁</Text>
+                            </View>
+                            <View className="flex-1">
+                              <Text className="text-lg font-bold text-gray-900 dark:text-light-100">
+                                {folder.name}
+                              </Text>
+                              <Text className="text-xs text-gray-500 dark:text-light-200 capitalize">
+                                {folder.folder_type}
+                              </Text>
+                            </View>
                           </View>
-                          <View className="flex-1">
-                            <Text className="text-lg font-bold text-gray-900">
-                              {folder.name}
-                            </Text>
-                            <Text className="text-xs text-gray-500">
-                              {folder.folder_type}
-                            </Text>
-                          </View>
+                          <Text className="text-gray-400 dark:text-light-200 text-xl">
+                            ›
+                          </Text>
                         </View>
                       </TouchableOpacity>
                     ))}
@@ -425,44 +556,48 @@ const NovelDetails = () => {
                 )}
 
                 {/* Files */}
-                <Text className="text-xl font-bold text-gray-900 mb-3">
-                  Documents ({files.length})
+                <Text className="text-xl font-bold text-gray-900 dark:text-light-100 mb-3">
+                  Documents ({currentFiles.length})
                 </Text>
-                {files.length > 0 ? (
-                  files.map((file) => (
+                {currentFiles.length > 0 ? (
+                  currentFiles.map((file) => (
                     <TouchableOpacity
                       key={file.id}
                       onPress={() => handleEditFile(file)}
                       onLongPress={() =>
                         handleDeleteItem("file", file.id, file.name)
                       }
-                      className="bg-white rounded-2xl p-4 mb-3 shadow-lg"
+                      className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-3 shadow-lg"
                     >
                       <View className="flex-row items-center justify-between">
                         <View className="flex-row items-center flex-1">
-                          <View className="w-10 h-10 rounded-xl bg-light-100 justify-center items-center mr-3">
+                          <View className="w-10 h-10 rounded-xl bg-light-100 dark:bg-dark-100 justify-center items-center mr-3">
                             <Text className="text-xl">📄</Text>
                           </View>
                           <View className="flex-1">
                             <Text
-                              className="text-base font-bold text-gray-900"
+                              className="text-base font-bold text-gray-900 dark:text-light-100"
                               numberOfLines={1}
                             >
                               {file.name}
                             </Text>
-                            <Text className="text-xs text-gray-500">
+                            <Text className="text-xs text-gray-500 dark:text-light-200">
                               {file.word_count} words
                             </Text>
                           </View>
                         </View>
-                        <Text className="text-gray-400">›</Text>
+                        <Text className="text-gray-400 dark:text-light-200">
+                          ›
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   ))
                 ) : (
-                  <View className="bg-white rounded-2xl p-8 items-center">
+                  <View className="bg-white dark:bg-dark-200 rounded-2xl p-8 items-center">
                     <Text className="text-4xl mb-2">📝</Text>
-                    <Text className="text-gray-600">No documents yet</Text>
+                    <Text className="text-gray-600 dark:text-light-200">
+                      No documents here yet
+                    </Text>
                   </View>
                 )}
               </View>
@@ -471,14 +606,14 @@ const NovelDetails = () => {
             {activeTab === "characters" && (
               <View>
                 <View className="flex-row justify-between items-center mb-4">
-                  <Text className="text-xl font-bold text-gray-900">
+                  <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
                     Characters ({characters.length})
                   </Text>
                   <TouchableOpacity
                     onPress={handleAddCharacter}
                     className="bg-secondary px-4 py-2 rounded-full"
                   >
-                    <Text className="text-gray-900 font-bold text-sm">
+                    <Text className="text-gray-900 dark:text-dark-300 font-bold text-sm">
                       + Add
                     </Text>
                   </TouchableOpacity>
@@ -487,34 +622,36 @@ const NovelDetails = () => {
                   characters.map((char) => (
                     <View
                       key={char.id}
-                      className="bg-white rounded-2xl p-4 mb-3 shadow-lg"
+                      className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-3 shadow-lg"
                     >
                       <View className="flex-row items-center">
                         <View className="w-12 h-12 rounded-full bg-primary justify-center items-center mr-3">
                           <Text className="text-2xl">👤</Text>
                         </View>
                         <View className="flex-1">
-                          <Text className="text-lg font-bold text-gray-900">
+                          <Text className="text-lg font-bold text-gray-900 dark:text-light-100">
                             {char.name}
                           </Text>
                           {char.role && (
-                            <Text className="text-sm text-gray-600 capitalize">
+                            <Text className="text-sm text-gray-600 dark:text-light-200 capitalize">
                               {char.role}
                             </Text>
                           )}
                         </View>
                       </View>
                       {char.description && (
-                        <Text className="text-sm text-gray-600 mt-3">
+                        <Text className="text-sm text-gray-600 dark:text-light-200 mt-3">
                           {char.description}
                         </Text>
                       )}
                     </View>
                   ))
                 ) : (
-                  <View className="bg-white rounded-2xl p-8 items-center">
+                  <View className="bg-white dark:bg-dark-200 rounded-2xl p-8 items-center">
                     <Text className="text-4xl mb-2">👥</Text>
-                    <Text className="text-gray-600">No characters yet</Text>
+                    <Text className="text-gray-600 dark:text-light-200">
+                      No characters yet
+                    </Text>
                   </View>
                 )}
               </View>
@@ -523,14 +660,14 @@ const NovelDetails = () => {
             {activeTab === "locations" && (
               <View>
                 <View className="flex-row justify-between items-center mb-4">
-                  <Text className="text-xl font-bold text-gray-900">
+                  <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
                     Locations ({locations.length})
                   </Text>
                   <TouchableOpacity
                     onPress={handleAddLocation}
                     className="bg-secondary px-4 py-2 rounded-full"
                   >
-                    <Text className="text-gray-900 font-bold text-sm">
+                    <Text className="text-gray-900 dark:text-dark-300 font-bold text-sm">
                       + Add
                     </Text>
                   </TouchableOpacity>
@@ -539,29 +676,31 @@ const NovelDetails = () => {
                   locations.map((loc) => (
                     <View
                       key={loc.id}
-                      className="bg-white rounded-2xl p-4 mb-3 shadow-lg"
+                      className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-3 shadow-lg"
                     >
                       <View className="flex-row items-center">
                         <View className="w-12 h-12 rounded-xl bg-secondary justify-center items-center mr-3">
                           <Text className="text-2xl">📍</Text>
                         </View>
                         <View className="flex-1">
-                          <Text className="text-lg font-bold text-gray-900">
+                          <Text className="text-lg font-bold text-gray-900 dark:text-light-100">
                             {loc.name}
                           </Text>
                         </View>
                       </View>
                       {loc.description && (
-                        <Text className="text-sm text-gray-600 mt-3">
+                        <Text className="text-sm text-gray-600 dark:text-light-200 mt-3">
                           {loc.description}
                         </Text>
                       )}
                     </View>
                   ))
                 ) : (
-                  <View className="bg-white rounded-2xl p-8 items-center">
+                  <View className="bg-white dark:bg-dark-200 rounded-2xl p-8 items-center">
                     <Text className="text-4xl mb-2">🗺️</Text>
-                    <Text className="text-gray-600">No locations yet</Text>
+                    <Text className="text-gray-600 dark:text-light-200">
+                      No locations yet
+                    </Text>
                   </View>
                 )}
               </View>
@@ -569,30 +708,30 @@ const NovelDetails = () => {
 
             {activeTab === "template" && templateStages.length > 0 && (
               <View>
-                <Text className="text-xl font-bold text-gray-900 mb-4">
+                <Text className="text-xl font-bold text-gray-900 dark:text-light-100 mb-4">
                   {project.writing_template.replace("_", " ").toUpperCase()}
                 </Text>
                 {templateStages.map((stage, index) => (
                   <View
                     key={stage?.id || index}
-                    className="bg-white rounded-2xl p-4 mb-3 shadow-lg"
+                    className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-3 shadow-lg"
                   >
                     <View className="flex-row items-start">
                       <View className="w-8 h-8 rounded-full bg-primary justify-center items-center mr-3">
-                        <Text className="text-white font-bold text-sm">
+                        <Text className="text-white dark:text-dark-100 font-bold text-sm">
                           {index + 1}
                         </Text>
                       </View>
                       <View className="flex-1">
-                        <Text className="text-lg font-bold text-gray-900 mb-1">
+                        <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-1">
                           {String(stage?.stage_name ?? "")}
                         </Text>
-                        <Text className="text-sm text-gray-600">
+                        <Text className="text-sm text-gray-600 dark:text-light-200">
                           {String(stage?.stage_description ?? "")}
                         </Text>
                         {stage?.is_completed ? (
-                          <View className="bg-green-100 px-3 py-1 rounded-full mt-2 self-start">
-                            <Text className="text-green-700 text-xs font-bold">
+                          <View className="bg-green-100 dark:bg-green-900 px-3 py-1 rounded-full mt-2 self-start">
+                            <Text className="text-green-700 dark:text-green-200 text-xs font-bold">
                               ✓ Completed
                             </Text>
                           </View>
@@ -606,31 +745,31 @@ const NovelDetails = () => {
 
             {activeTab === "publish" && (
               <View>
-                <Text className="text-xl font-bold text-gray-900 mb-4">
+                <Text className="text-xl font-bold text-gray-900 dark:text-light-100 mb-4">
                   Publishing Information
                 </Text>
-                <View className="bg-white rounded-2xl p-6 shadow-lg">
+                <View className="bg-white dark:bg-dark-200 rounded-2xl p-6 shadow-lg">
                   <View className="mb-4">
-                    <Text className="text-sm font-semibold text-gray-700 mb-2">
+                    <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
                       ISBN
                     </Text>
-                    <Text className="text-base text-gray-900">
+                    <Text className="text-base text-gray-900 dark:text-light-200">
                       {publishingSettings?.isbn || "Not set"}
                     </Text>
                   </View>
                   <View className="mb-4">
-                    <Text className="text-sm font-semibold text-gray-700 mb-2">
+                    <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
                       Publisher
                     </Text>
-                    <Text className="text-base text-gray-900">
+                    <Text className="text-base text-gray-900 dark:text-light-200">
                       {publishingSettings?.publisher || "Not set"}
                     </Text>
                   </View>
                   <View className="mb-4">
-                    <Text className="text-sm font-semibold text-gray-700 mb-2">
+                    <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
                       Export Format
                     </Text>
-                    <Text className="text-base text-gray-900 uppercase">
+                    <Text className="text-base text-gray-900 dark:text-light-200 uppercase">
                       {publishingSettings?.export_format || "PDF"}
                     </Text>
                   </View>
@@ -643,7 +782,7 @@ const NovelDetails = () => {
                     }
                     className="bg-primary py-3 rounded-full mt-4"
                   >
-                    <Text className="text-white font-bold text-center">
+                    <Text className="text-white dark:text-dark-100 font-bold text-center">
                       Edit Publishing Info
                     </Text>
                   </TouchableOpacity>
@@ -661,22 +800,29 @@ const NovelDetails = () => {
         animationType="slide"
         onRequestClose={() => setShowAddModal(false)}
       >
-        <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white rounded-t-3xl p-6">
-            <Text className="text-2xl font-bold text-gray-900 mb-4">
-              Add New {newItemType === "folder" ? "Chapter" : "Document"}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          className="flex-1 justify-end bg-black/50"
+        >
+          <View className="bg-white dark:bg-dark-200 rounded-t-3xl p-6 max-h-[90%]">
+            <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-4">
+              Add New Content
             </Text>
 
             <View className="flex-row gap-3 mb-4">
               <TouchableOpacity
                 onPress={() => setNewItemType("file")}
                 className={`flex-1 py-3 rounded-2xl ${
-                  newItemType === "file" ? "bg-primary" : "bg-light-100"
+                  newItemType === "file"
+                    ? "bg-primary"
+                    : "bg-light-100 dark:bg-dark-100"
                 }`}
               >
                 <Text
                   className={`text-center font-bold ${
-                    newItemType === "file" ? "text-white" : "text-gray-600"
+                    newItemType === "file"
+                      ? "text-white dark:text-dark-100"
+                      : "text-gray-600 dark:text-light-200"
                   }`}
                 >
                   📄 Document
@@ -685,44 +831,67 @@ const NovelDetails = () => {
               <TouchableOpacity
                 onPress={() => setNewItemType("folder")}
                 className={`flex-1 py-3 rounded-2xl ${
-                  newItemType === "folder" ? "bg-primary" : "bg-light-100"
+                  newItemType === "folder"
+                    ? "bg-primary"
+                    : "bg-light-100 dark:bg-dark-100"
                 }`}
               >
                 <Text
                   className={`text-center font-bold ${
-                    newItemType === "folder" ? "text-white" : "text-gray-600"
+                    newItemType === "folder"
+                      ? "text-white dark:text-dark-100"
+                      : "text-gray-600 dark:text-light-200"
                   }`}
                 >
-                  📁 Chapter
+                  📁 Folder
                 </Text>
               </TouchableOpacity>
             </View>
 
+            {folderPath.length > 0 && (
+              <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-3 mb-4">
+                <Text className="text-xs text-gray-600 dark:text-light-200 mb-1">
+                  Creating in:
+                </Text>
+                <Text className="text-sm font-semibold text-gray-900 dark:text-light-100">
+                  {folderPath.map((f) => f.name).join(" › ")}
+                </Text>
+              </View>
+            )}
+
             <TextInput
               value={newItemName}
               onChangeText={setNewItemName}
-              placeholder="Enter name..."
-              className="bg-light-100 rounded-2xl px-4 py-4 mb-4 text-gray-900"
+              placeholder={`Enter ${newItemType} name...`}
+              placeholderTextColor="#9CA3AF"
+              className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-4 mb-4 text-gray-900 dark:text-light-100"
             />
 
             {newItemType === "file" && (
-              <TextInput
-                value={newItemContent}
-                onChangeText={setNewItemContent}
-                placeholder="Start writing... (optional)"
-                multiline
-                numberOfLines={6}
-                textAlignVertical="top"
-                className="bg-light-100 rounded-2xl px-4 py-4 mb-4 text-gray-900"
-              />
+              <ScrollView style={{ maxHeight: 200 }} className="mb-4">
+                <TextInput
+                  value={newItemContent}
+                  onChangeText={setNewItemContent}
+                  placeholder="Start writing... (optional)"
+                  placeholderTextColor="#9CA3AF"
+                  multiline
+                  textAlignVertical="top"
+                  className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-4 text-gray-900 dark:text-light-100"
+                  style={{ minHeight: 150 }}
+                />
+              </ScrollView>
             )}
 
             <View className="flex-row gap-3">
               <TouchableOpacity
-                onPress={() => setShowAddModal(false)}
-                className="flex-1 bg-light-100 py-4 rounded-full"
+                onPress={() => {
+                  setShowAddModal(false);
+                  setNewItemName("");
+                  setNewItemContent("");
+                }}
+                className="flex-1 bg-light-100 dark:bg-dark-100 py-4 rounded-full"
               >
-                <Text className="text-gray-600 font-bold text-center">
+                <Text className="text-gray-600 dark:text-light-200 font-bold text-center">
                   Cancel
                 </Text>
               </TouchableOpacity>
@@ -730,47 +899,79 @@ const NovelDetails = () => {
                 onPress={handleAddItem}
                 className="flex-1 bg-secondary py-4 rounded-full"
               >
-                <Text className="text-gray-900 font-bold text-center">
+                <Text className="text-gray-900 dark:text-dark-300 font-bold text-center">
                   Create
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
-      {/* Edit File Modal */}
+      {/* Enhanced Edit File Modal with Focus Mode */}
       <Modal
         visible={!!editingItem}
-        transparent
         animationType="slide"
         onRequestClose={() => setEditingItem(null)}
       >
-        <View className="flex-1 bg-white">
-          <View className="px-6 pt-16 pb-6">
-            <View className="flex-row items-center justify-between mb-4">
-              <TouchableOpacity
-                onPress={() => setEditingItem(null)}
-                className="w-10 h-10 rounded-full bg-light-100 justify-center items-center"
-              >
-                <Text className="text-xl">✕</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleSaveEdit}
-                className="bg-secondary px-6 py-3 rounded-full"
-              >
-                <Text className="text-gray-900 font-bold">Save</Text>
-              </TouchableOpacity>
-            </View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          className="flex-1 bg-white dark:bg-dark-300"
+        >
+          <View className="px-6 pt-16 pb-6 flex-1">
+            {/* Editor Header */}
+            {!isFocusMode && (
+              <View className="flex-row items-center justify-between mb-4">
+                <TouchableOpacity
+                  onPress={() => setEditingItem(null)}
+                  className="w-10 h-10 rounded-full bg-light-100 dark:bg-dark-200 justify-center items-center"
+                >
+                  <Text className="text-xl dark:text-light-100">✕</Text>
+                </TouchableOpacity>
+                <View className="flex-row gap-3">
+                  <TouchableOpacity
+                    onPress={() => setIsFocusMode(true)}
+                    className="bg-light-100 dark:bg-dark-200 px-4 py-3 rounded-full"
+                  >
+                    <Text className="text-gray-900 dark:text-light-100 font-bold">
+                      🎯 Focus
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleSaveEdit}
+                    className="bg-secondary px-6 py-3 rounded-full"
+                  >
+                    <Text className="text-gray-900 dark:text-dark-300 font-bold">
+                      Save
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
-            <TextInput
-              value={editingItem?.name}
-              onChangeText={(text) =>
-                setEditingItem({ ...editingItem, name: text })
-              }
-              placeholder="Document name"
-              className="bg-light-100 rounded-2xl px-4 py-4 mb-4 text-gray-900 text-lg font-bold"
-            />
+            {/* Focus Mode Toggle */}
+            {isFocusMode && (
+              <TouchableOpacity
+                onPress={() => setIsFocusMode(false)}
+                className="absolute top-16 right-6 z-10 bg-primary px-4 py-2 rounded-full shadow-lg"
+              >
+                <Text className="text-white dark:text-dark-100 text-xs font-bold">
+                  Exit Focus
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {!isFocusMode && (
+              <TextInput
+                value={editingItem?.name}
+                onChangeText={(text) =>
+                  setEditingItem({ ...editingItem, name: text })
+                }
+                placeholder="Document name"
+                placeholderTextColor="#9CA3AF"
+                className="bg-light-100 dark:bg-dark-200 rounded-2xl px-4 py-4 mb-4 text-gray-900 dark:text-light-100 text-lg font-bold"
+              />
+            )}
 
             <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
               <TextInput
@@ -779,21 +980,35 @@ const NovelDetails = () => {
                   setEditingItem({ ...editingItem, content: text })
                 }
                 placeholder="Start writing your story..."
+                placeholderTextColor="#9CA3AF"
                 multiline
                 textAlignVertical="top"
-                className="bg-white rounded-2xl px-4 py-4 text-gray-900 text-base"
-                style={{ minHeight: 400 }}
+                className={`${
+                  isFocusMode
+                    ? "bg-transparent"
+                    : "bg-white dark:bg-dark-200 rounded-2xl"
+                } px-4 py-4 text-gray-900 dark:text-light-100 text-base leading-7`}
+                style={{ minHeight: 400, fontSize: isFocusMode ? 18 : 16 }}
+                autoFocus={isFocusMode}
               />
 
-              <View className="bg-light-100 rounded-2xl p-4 mt-4">
-                <Text className="text-sm text-gray-600">
-                  Word Count:{" "}
-                  {editingItem?.content?.trim().split(/\s+/).length || 0}
-                </Text>
-              </View>
+              {!isFocusMode && (
+                <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mt-4">
+                  <View className="flex-row justify-between items-center">
+                    <Text className="text-sm text-gray-600 dark:text-light-200">
+                      Word Count:{" "}
+                      {editingItem?.content?.trim().split(/\s+/).filter(Boolean)
+                        .length || 0}
+                    </Text>
+                    <Text className="text-sm text-gray-600 dark:text-light-200">
+                      Characters: {editingItem?.content?.length || 0}
+                    </Text>
+                  </View>
+                </View>
+              )}
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </Background>
   );
