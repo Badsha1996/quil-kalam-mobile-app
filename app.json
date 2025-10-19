@@ -40,6 +40,12 @@
       "favicon": "./assets/images/transparent-bg.png"
     },
     "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow access to select images for your profile and covers"
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",

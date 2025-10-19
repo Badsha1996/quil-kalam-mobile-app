@@ -138,6 +138,16 @@ const Layout = () => {
         }}
       />
       <Tabs.Screen
+        name="published"
+        options={{
+          title: "published",
+          headerShown: false,
+          tabBarIcon: ({ focused }) => (
+            <TabsIcon iconName="public" focused={focused} title="Stories" />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="search"
         options={{
           title: "Search",
