@@ -11,6 +11,7 @@ export default function RootLayout() {
     <Stack>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="novel/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="poetry/[id]" options={{ headerShown: false }} />
     </Stack>
   );
 }

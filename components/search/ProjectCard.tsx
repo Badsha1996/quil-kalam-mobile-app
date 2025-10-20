@@ -50,12 +50,15 @@ const ProjectCard = ({
       }}
     >
       <TouchableOpacity
-        onPress={() =>
+        onPress={() => {
+          // dynamically choose the path based on project type
+          const basePath =
+            project.type === "poetry" ? "/poetry/[id]" : "/novel/[id]";
           router.push({
-            pathname: "/novel/[id]",
+            pathname: basePath,
             params: { id: String(project.id) },
-          })
-        }
+          });
+        }}
         onLongPress={() => handleDeleteProject(project.id, project.title)}
         className="bg-white dark:bg-dark-200 rounded-3xl p-5 mb-4 shadow-lg active:opacity-80"
         style={{

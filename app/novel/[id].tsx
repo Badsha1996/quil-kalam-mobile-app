@@ -1,4 +1,12 @@
 import Background from "@/components/common/Background";
+import { templates } from "@/constants/create";
+import {
+  structure,
+  structure2,
+  structure3,
+  structure4,
+  structure5,
+} from "@/constants/template";
 import {
   createItem,
   deleteItem,
@@ -44,47 +52,16 @@ interface ItemNode {
   children?: ItemNode[];
 }
 
-const { width } = Dimensions.get("window");
+interface WritingSettings {
+  fontSize: number;
+  fontFamily: string;
+  lineHeight: number;
+  textColor: string;
+  backgroundColor: string;
+  paragraphSpacing: number;
+}
 
-// Template definitions
-const templates = [
-  {
-    value: "freeform",
-    label: "Freeform",
-    desc: "No structure - start from scratch",
-    icon: "🎨",
-  },
-  {
-    value: "heros_journey",
-    label: "Hero's Journey",
-    desc: "12-stage mythological story structure",
-    icon: "🦸",
-  },
-  {
-    value: "three_act",
-    label: "Three Act Structure",
-    desc: "Classic beginning-middle-end structure",
-    icon: "🎭",
-  },
-  {
-    value: "save_the_cat",
-    label: "Save The Cat",
-    desc: "15-beat screenplay structure",
-    icon: "🐱",
-  },
-  {
-    value: "seven_point",
-    label: "Seven Point Structure",
-    desc: "Dan Wells' plot structure system",
-    icon: "📊",
-  },
-  {
-    value: "snowflake",
-    label: "Snowflake Method",
-    desc: "Start simple and expand",
-    icon: "❄️",
-  },
-];
+const { width } = Dimensions.get("window");
 
 const NovelDetails = () => {
   const router = useRouter();
@@ -109,6 +86,7 @@ const NovelDetails = () => {
   const [showBookPreview, setShowBookPreview] = useState(false);
   const [showCoverModal, setShowCoverModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showWritingSettings, setShowWritingSettings] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
 
   // Form states
@@ -126,8 +104,19 @@ const NovelDetails = () => {
     imageUri: "",
   });
 
+  // Writing settings
+  const [writingSettings, setWritingSettings] = useState<WritingSettings>({
+    fontSize: 16,
+    fontFamily: "System",
+    lineHeight: 1.6,
+    textColor: "#000000",
+    backgroundColor: "#ffffff",
+    paragraphSpacing: 12,
+  });
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const headerHeight = useRef(new Animated.Value(1)).current;
+  const editorRef = useRef<TextInput>(null);
 
   useEffect(() => {
     loadProjectData();
@@ -159,143 +148,71 @@ const NovelDetails = () => {
         )
     );
 
+    // Only apply template if no structure exists and template is not freeform
     if (
       !hasStructure &&
+      // @ts-ignore
       projectData.writing_template &&
+      // @ts-ignore
       projectData.writing_template !== "freeform"
     ) {
-      applyTemplate(projectData.writing_template);
+      // @ts-ignore
+      applyTemplate(projectData.writing_template, false);
     }
   };
 
-  const applyTemplate = (templateType: string) => {
-    const existingItems = getItemsByProject(projectId) as ItemNode[];
+  const applyTemplate = (
+    templateType: string,
+    clearExisting: boolean = true
+  ) => {
+    try {
+      const existingItems = getItemsByProject(projectId) as ItemNode[];
 
-    // Clear existing structure if it's just the default empty state
-    if (
-      existingItems.length === 0 ||
-      existingItems.every((item) => !item.parent_item_id)
-    ) {
-      existingItems.forEach((item) => {
-        deleteItem(item.id);
-      });
+      // Clear existing structure if requested
+      if (clearExisting && existingItems.length > 0) {
+        existingItems.forEach((item) => {
+          deleteItem(item.id);
+        });
+      }
+
+      // Apply new template structure
+      switch (templateType) {
+        case "heros_journey":
+          createHerosJourneyStructure();
+          break;
+        case "three_act":
+          createThreeActStructure();
+          break;
+        case "save_the_cat":
+          createSaveTheCatStructure();
+          break;
+        case "seven_point":
+          createSevenPointStructure();
+          break;
+        case "snowflake":
+          createSnowflakeStructure();
+          break;
+        default:
+          // Freeform - no structure
+          break;
+      }
+
+      // Update project with selected template
+      // @ts-ignore
+      updateProject(projectId, { writing_template: templateType });
+      loadProjectData();
+
+      Alert.alert(
+        "Success",
+        `Applied ${templates.find((t) => t.value === templateType)?.label} template`
+      );
+    } catch (error) {
+      Alert.alert("Error", "Failed to apply template");
+      console.error("Template application error:", error);
     }
-
-    switch (templateType) {
-      case "heros_journey":
-        createHerosJourneyStructure();
-        break;
-      case "three_act":
-        createThreeActStructure();
-        break;
-      case "save_the_cat":
-        createSaveTheCatStructure();
-        break;
-      case "seven_point":
-        createSevenPointStructure();
-        break;
-      case "snowflake":
-        createSnowflakeStructure();
-        break;
-      default:
-        // Freeform - no structure
-        break;
-    }
-
-    // Update project with selected template
-    //@ts-ignore
-    updateProject(projectId, { writing_template: templateType });
-    loadProjectData();
   };
 
   const createHerosJourneyStructure = () => {
-    const structure = [
-      {
-        name: "Act I: Departure",
-        type: "folder",
-        color: "#10B981",
-        icon: "🚀",
-        children: [
-          {
-            name: "1. Ordinary World",
-            content:
-              "Introduce the hero in their normal life before the adventure begins. Establish their routine, relationships, and inner conflicts. Show what they stand to lose.",
-          },
-          {
-            name: "2. Call to Adventure",
-            content:
-              "The hero is presented with a challenge, problem, or adventure that disrupts their ordinary world. This could be a message, discovery, or event that forces change.",
-          },
-          {
-            name: "3. Refusal of the Call",
-            content:
-              "Initially, the hero is reluctant to accept the challenge due to fear, insecurity, or obligation. They hesitate and consider staying in their comfortable existence.",
-          },
-          {
-            name: "4. Meeting the Mentor",
-            content:
-              "The hero meets a mentor who provides guidance, training, wisdom, or magical gifts that will help on the journey. The mentor prepares them for what lies ahead.",
-          },
-          {
-            name: "5. Crossing the Threshold",
-            content:
-              "The hero commits to the adventure and crosses into the special world, leaving their ordinary life behind. There's no turning back from this point.",
-          },
-        ],
-      },
-      {
-        name: "Act II: Initiation",
-        type: "folder",
-        color: "#F59E0B",
-        icon: "⚔️",
-        children: [
-          {
-            name: "6. Tests, Allies, Enemies",
-            content:
-              "The hero faces a series of challenges and meets allies who help and enemies who hinder. They learn the rules of the special world and begin transformation.",
-          },
-          {
-            name: "7. Approach to Inmost Cave",
-            content:
-              "The hero prepares for the major challenge in the special world's most dangerous location. They make final preparations and confront their deepest fears.",
-          },
-          {
-            name: "8. Ordeal",
-            content:
-              "The hero faces their greatest fear or most difficult challenge, experiencing a 'death' and 'rebirth' moment. This is the central crisis of the story.",
-          },
-          {
-            name: "9. Reward",
-            content:
-              "The hero achieves their goal or gains a reward (sword, elixir, knowledge, reconciliation). They have proven themselves worthy but aren't safe yet.",
-          },
-        ],
-      },
-      {
-        name: "Act III: Return",
-        type: "folder",
-        color: "#EF4444",
-        icon: "🏆",
-        children: [
-          {
-            name: "10. The Road Back",
-            content:
-              "The hero begins the journey back to the ordinary world, often pursued by vengeful forces. The stakes are raised as they race toward safety.",
-          },
-          {
-            name: "11. Resurrection",
-            content:
-              "The hero faces a final test where they must use everything learned on the journey. This is the climax where they prove their transformation is complete.",
-          },
-          {
-            name: "12. Return with Elixir",
-            content:
-              "The hero returns home transformed with knowledge, power, or wisdom that benefits their ordinary world. They have achieved mastery of both worlds.",
-          },
-        ],
-      },
-    ];
-
     structure.forEach((act, actIndex) => {
       const actId = createItem({
         projectId,
@@ -320,109 +237,7 @@ const NovelDetails = () => {
   };
 
   const createThreeActStructure = () => {
-    const structure = [
-      {
-        name: "Act I: Setup",
-        type: "folder",
-        color: "#3B82F6",
-        icon: "🎬",
-        children: [
-          {
-            name: "Opening Image",
-            content:
-              "A snapshot of the hero's life before the adventure begins. Establish the ordinary world and what needs to change.",
-          },
-          {
-            name: "Theme Stated",
-            content:
-              "The central theme or message of the story is hinted at, usually through a conversation with a secondary character.",
-          },
-          {
-            name: "Setup",
-            content:
-              "Introduce main characters, setting, and the protagonist's world. Show their flaws, desires, and the status quo.",
-          },
-          {
-            name: "Catalyst",
-            content:
-              "The inciting incident that disrupts the hero's ordinary world and sets the story in motion.",
-          },
-          {
-            name: "Debate",
-            content:
-              "The hero hesitates, weighing the risks and consequences of embarking on the journey.",
-          },
-        ],
-      },
-      {
-        name: "Act II: Confrontation",
-        type: "folder",
-        color: "#8B5CF6",
-        icon: "💥",
-        children: [
-          {
-            name: "Break Into Two",
-            content:
-              "The hero makes a choice and fully enters the new world or situation, leaving the old world behind.",
-          },
-          {
-            name: "B Story",
-            content:
-              "Introduce a secondary storyline, often a love story or friendship that supports the theme.",
-          },
-          {
-            name: "Fun and Games",
-            content:
-              "The premise is explored through a series of challenges, discoveries, and character development.",
-          },
-          {
-            name: "Midpoint",
-            content:
-              "A major event that raises stakes, often a false victory or defeat that changes the direction.",
-          },
-          {
-            name: "Bad Guys Close In",
-            content:
-              "Internal and external pressures intensify as the antagonist gains ground.",
-          },
-          {
-            name: "All Is Lost",
-            content:
-              "The lowest point where everything seems hopeless and the hero appears defeated.",
-          },
-          {
-            name: "Dark Night of the Soul",
-            content:
-              "The hero hits rock bottom and must find the inner strength to continue.",
-          },
-        ],
-      },
-      {
-        name: "Act III: Resolution",
-        type: "folder",
-        color: "#06B6D4",
-        icon: "🎯",
-        children: [
-          {
-            name: "Break Into Three",
-            content:
-              "The hero finds a solution, often combining lessons from both A and B stories.",
-          },
-          {
-            name: "Finale",
-            content:
-              "The climax where the hero confronts the main conflict using everything they've learned.",
-          },
-          {
-            name: "Final Image",
-            content:
-              "The opposite of the opening image, showing how the hero and their world have changed.",
-          },
-        ],
-      },
-    ];
-
-    structure.forEach((act, actIndex) => {
+    structure2.forEach((act, actIndex) => {
       const actId = createItem({
         projectId,
         itemType: "folder",
@@ -446,101 +261,7 @@ const NovelDetails = () => {
   };
 
   const createSaveTheCatStructure = () => {
-    const structure = [
-      {
-        name: "Opening Image",
-        type: "document",
-        content:
-          "A visual that represents the tone and theme of the story. Shows the hero's world before change.",
-      },
-      {
-        name: "Theme Stated",
-        type: "document",
-        content:
-          "The moral or lesson the hero will learn, usually stated by another character early in the story.",
-      },
-      {
-        name: "Set-up",
-        type: "folder",
-        color: "#EC4899",
-        icon: "🏗️",
-        children: [
-          {
-            name: "Catalyst",
-            content:
-              "The inciting incident that kicks off the story and presents the hero with a challenge.",
-          },
-          {
-            name: "Debate",
-            content:
-              "The hero weighs the pros and cons of accepting the challenge or making a change.",
-          },
-        ],
-      },
-      {
-        name: "Break into Act II",
-        type: "document",
-        content:
-          "The hero makes a decision and crosses the threshold into the new world or situation.",
-      },
-      {
-        name: "B Story",
-        type: "document",
-        content:
-          "The relationship story that carries the theme and helps the hero grow.",
-      },
-      {
-        name: "Fun and Games",
-        type: "folder",
-        color: "#F59E0B",
-        icon: "🎮",
-        children: [
-          {
-            name: "Midpoint",
-            content:
-              "A big event that raises stakes - either a false victory or false defeat.",
-          },
-          {
-            name: "Bad Guys Close In",
-            content:
-              "Internal and external forces tighten their grip on the hero.",
-          },
-        ],
-      },
-      {
-        name: "All Is Lost",
-        type: "document",
-        content:
-          "The lowest point where everything seems hopeless for the hero.",
-      },
-      {
-        name: "Dark Night of the Soul",
-        type: "document",
-        content:
-          "The hero reflects on their journey and finds the will to continue.",
-      },
-      {
-        name: "Break into Act III",
-        type: "document",
-        content:
-          "The hero finds a solution by combining lessons from A and B stories.",
-      },
-      {
-        name: "Finale",
-        type: "folder",
-        color: "#10B981",
-        icon: "🏁",
-        children: [
-          {
-            name: "Final Image",
-            content:
-              "The opposite of the opening image, showing how the hero has changed.",
-          },
-        ],
-      },
-    ];
-
-    structure.forEach((item, index) => {
+    structure3.forEach((item, index) => {
       if (item.type === "folder" && item.children) {
         const folderId = createItem({
           projectId,
@@ -574,52 +295,7 @@ const NovelDetails = () => {
   };
 
   const createSevenPointStructure = () => {
-    const structure = [
-      {
-        name: "Hook",
-        type: "document",
-        content:
-          "Start with the opposite of your resolution. Show a character in a state that contrasts with who they'll become.",
-      },
-      {
-        name: "Plot Turn 1",
-        type: "document",
-        content:
-          "The inciting incident that moves the story from the hook into the main conflict. Introduces the central problem.",
-      },
-      {
-        name: "Pinch 1",
-        type: "document",
-        content:
-          "Apply pressure to the characters. Force them to step up and make decisions, often introducing the antagonist.",
-      },
-      {
-        name: "Midpoint",
-        type: "document",
-        content:
-          "The moment when characters move from reaction to action. They understand what's really at stake.",
-      },
-      {
-        name: "Pinch 2",
-        type: "document",
-        content:
-          "Apply even more pressure. The worst happens, plans fail, and things look hopeless.",
-      },
-      {
-        name: "Plot Turn 2",
-        type: "document",
-        content:
-          "The final piece of the puzzle falls into place. Characters discover what they need to resolve the story.",
-      },
-      {
-        name: "Resolution",
-        type: "document",
-        content:
-          "The climax and conclusion. Characters confront the main conflict and demonstrate their growth.",
-      },
-    ];
-
-    structure.forEach((point, index) => {
+    structure4.forEach((point, index) => {
       createItem({
         projectId,
         itemType: "document",
@@ -631,87 +307,7 @@ const NovelDetails = () => {
   };
 
   const createSnowflakeStructure = () => {
-    const structure = [
-      {
-        name: "Step 1: One Sentence Summary",
-        type: "document",
-        content:
-          "Write a one-sentence summary of your novel that hooks the reader.",
-      },
-      {
-        name: "Step 2: One Paragraph Summary",
-        type: "document",
-        content:
-          "Expand the sentence into a full paragraph describing the story setup, major disasters, and ending.",
-      },
-      {
-        name: "Step 3: Character Sketches",
-        type: "folder",
-        color: "#8B5CF6",
-        icon: "👤",
-        children: [
-          {
-            name: "Main Character",
-            content:
-              "Define your protagonist's name, story goal, motivation, conflict, epiphany, and summary.",
-          },
-          {
-            name: "Antagonist",
-            content:
-              "Define the main opposing force - could be a person, system, or internal conflict.",
-          },
-          {
-            name: "Supporting Characters",
-            content:
-              "Brief sketches of other important characters and their roles.",
-          },
-        ],
-      },
-      {
-        name: "Step 4: Expand to One Page",
-        type: "document",
-        content:
-          "Expand each sentence of your paragraph into a full paragraph, creating a one-page synopsis.",
-      },
-      {
-        name: "Step 5: Character Charts",
-        type: "folder",
-        color: "#EC4899",
-        icon: "📋",
-        children: [
-          {
-            name: "Main Character Details",
-            content:
-              "Full background, personality traits, appearance, and character arc.",
-          },
-          {
-            name: "Supporting Cast Details",
-            content: "Complete profiles for all major supporting characters.",
-          },
-        ],
-      },
-      {
-        name: "Step 6: Expand to Four Pages",
-        type: "document",
-        content:
-          "Expand each paragraph from the one-page synopsis into a full page, creating a four-page detailed outline.",
-      },
-      {
-        name: "Step 7: Scene List",
-        type: "folder",
-        color: "#10B981",
-        icon: "🎬",
-        children: [
-          {
-            name: "Scene Planning",
-            content:
-              "Create a list of every scene in the novel with POV character and brief description.",
-          },
-        ],
-      },
-    ];
-
-    structure.forEach((step, index) => {
+    structure5.forEach((step, index) => {
       if (step.type === "folder" && step.children) {
         const folderId = createItem({
           projectId,
@@ -1068,20 +664,200 @@ const NovelDetails = () => {
     return docs.sort((a, b) => a.order_index - b.order_index);
   };
 
+  const updateWritingSetting = (key: keyof WritingSettings, value: any) => {
+    setWritingSettings((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
+  const renderWritingSettingsModal = () => (
+    <Modal
+      visible={showWritingSettings}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setShowWritingSettings(false)}
+    >
+      <View className="flex-1 bg-black/80 justify-center items-center px-6">
+        <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md">
+          <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-6 text-center">
+            Writing Settings
+          </Text>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Font Size */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-700 dark:text-light-200 mb-2">
+                Font Size: {writingSettings.fontSize}px
+              </Text>
+              <View className="flex-row gap-2">
+                {[12, 14, 16, 18, 20].map((size) => (
+                  <TouchableOpacity
+                    key={size}
+                    onPress={() => updateWritingSetting("fontSize", size)}
+                    className={`flex-1 py-2 rounded-lg ${
+                      writingSettings.fontSize === size
+                        ? "bg-primary"
+                        : "bg-light-100 dark:bg-dark-100"
+                    }`}
+                  >
+                    <Text
+                      className={`text-center font-bold ${
+                        writingSettings.fontSize === size
+                          ? "text-white"
+                          : "text-gray-600 dark:text-light-200"
+                      }`}
+                    >
+                      {size}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Font Family */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-700 dark:text-light-200 mb-2">
+                Font Family
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {["System", "Serif", "Monospace"].map((font) => (
+                  <TouchableOpacity
+                    key={font}
+                    onPress={() => updateWritingSetting("fontFamily", font)}
+                    className={`flex-1 py-2 rounded-lg ${
+                      writingSettings.fontFamily === font
+                        ? "bg-primary"
+                        : "bg-light-100 dark:bg-dark-100"
+                    }`}
+                  >
+                    <Text
+                      className={`text-center font-bold ${
+                        writingSettings.fontFamily === font
+                          ? "text-white"
+                          : "text-gray-600 dark:text-light-200"
+                      }`}
+                    >
+                      {font}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Text Color */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-700 dark:text-light-200 mb-2">
+                Text Color
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {[
+                  "#000000",
+                  "#333333",
+                  "#666666",
+                  "#2E4057",
+                  "#8B4513",
+                  "#2F4F4F",
+                ].map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    onPress={() => updateWritingSetting("textColor", color)}
+                    className="w-10 h-10 rounded-full border-2 border-gray-300"
+                    style={{ backgroundColor: color }}
+                  >
+                    {writingSettings.textColor === color && (
+                      <View className="flex-1 justify-center items-center">
+                        <Text className="text-white text-lg">✓</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Background Color */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-700 dark:text-light-200 mb-2">
+                Background Color
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {[
+                  "#FFFFFF",
+                  "#F8F9FA",
+                  "#FFF8E1",
+                  "#E8F5E8",
+                  "#E3F2FD",
+                  "#F3E5F5",
+                  "#000000",
+                ].map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    onPress={() =>
+                      updateWritingSetting("backgroundColor", color)
+                    }
+                    className="w-10 h-10 rounded-full border-2 border-gray-300"
+                    style={{ backgroundColor: color }}
+                  >
+                    {writingSettings.backgroundColor === color && (
+                      <View className="flex-1 justify-center items-center">
+                        <Text className="text-gray-600 text-lg">✓</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Line Height */}
+            <View className="mb-4">
+              <Text className="text-sm font-semibold text-gray-700 dark:text-light-200 mb-2">
+                Line Height: {writingSettings.lineHeight}
+              </Text>
+              <View className="flex-row gap-2">
+                {[1.2, 1.4, 1.6, 1.8, 2.0].map((height) => (
+                  <TouchableOpacity
+                    key={height}
+                    onPress={() => updateWritingSetting("lineHeight", height)}
+                    className={`flex-1 py-2 rounded-lg ${
+                      writingSettings.lineHeight === height
+                        ? "bg-primary"
+                        : "bg-light-100 dark:bg-dark-100"
+                    }`}
+                  >
+                    <Text
+                      className={`text-center font-bold ${
+                        writingSettings.lineHeight === height
+                          ? "text-white"
+                          : "text-gray-600 dark:text-light-200"
+                      }`}
+                    >
+                      {height}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
+
+          <TouchableOpacity
+            onPress={() => setShowWritingSettings(false)}
+            className="bg-primary py-4 rounded-full mt-4"
+          >
+            <Text className="text-white font-bold text-center">Apply</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
   const frontCover = covers.find((c) => c.cover_type === "front");
   const backCover = covers.find((c) => c.cover_type === "back");
+
   const renderItemTree = (items: ItemNode[], depth: number = 0) => {
     return items.map((item) => {
-      const safeName =
-        typeof item.name === "string" ? item.name : String(item.name ?? "");
-      const safeType =
-        typeof item.item_type === "string"
-          ? item.item_type
-          : String(item.item_type ?? "");
-      const safeIcon =
-        typeof (item.icon || getItemIcon(item.item_type)) === "string"
-          ? item.icon || getItemIcon(item.item_type)
-          : "";
+      const safeName = item.name || "Untitled";
+      const safeType = item.item_type || "document";
+      const safeIcon = item.icon || getItemIcon(item.item_type);
 
       return (
         <View key={item.id}>
@@ -1097,31 +873,31 @@ const NovelDetails = () => {
                   className="w-10 h-10 rounded-xl justify-center items-center mr-3"
                   style={{ backgroundColor: item.color || "#F3F4F6" }}
                 >
-                  <Text className="text-xl">{safeIcon}</Text>
+                  <Text className="text-xl">{String(safeIcon)}</Text>
                 </View>
                 <View className="flex-1">
                   <Text
                     className="text-base font-bold text-gray-900 dark:text-light-100"
                     numberOfLines={1}
                   >
-                    {safeName}
+                    {String(safeName)}
                   </Text>
                   <View className="flex-row items-center gap-2 mt-1">
                     <Text className="text-xs text-gray-500 dark:text-light-200 capitalize">
-                      {safeType}
+                      {String(safeType)}
                     </Text>
-                    {item.word_count && item.word_count > 0 && (
+                    {item.word_count !== undefined && item.word_count > 0 ? (
                       <Text className="text-xs text-gray-500 dark:text-light-200">
                         • {item.word_count} words
                       </Text>
-                    )}
+                    ) : null}
                   </View>
                 </View>
               </View>
               {(item.item_type === "folder" ||
                 item.item_type === "chapter") && (
                 <Text className="text-gray-400 dark:text-light-200 text-xl">
-                  ›
+                  {"›"}
                 </Text>
               )}
             </View>
@@ -1145,6 +921,7 @@ const NovelDetails = () => {
           🎨 Template
         </Text>
       </TouchableOpacity>
+
       <TouchableOpacity
         onPress={() => setShowCoverModal(true)}
         className="bg-white dark:bg-dark-200 px-4 py-2 rounded-full shadow-lg"
@@ -1189,41 +966,39 @@ const NovelDetails = () => {
             </Text>
 
             {templates.map((template) => (
-              <View key={template.value}>
-                <TouchableOpacity
-                  key={template.value}
-                  onPress={() => {
-                    applyTemplate(template.value);
-                    setShowTemplateModal(false);
-                  }}
-                  className={`p-4 rounded-2xl mb-3 border-2 ${
-                    project?.writing_template === template.value
-                      ? "border-primary bg-primary/10"
-                      : "border-gray-200 dark:border-dark-100 bg-light-100 dark:bg-dark-100"
-                  }`}
-                >
-                  <View className="flex-row items-center">
-                    <Text className="text-2xl mr-3">{template.icon}</Text>
-                    <View className="flex-1">
-                      <Text
-                        className={`font-bold text-base ${
-                          project?.writing_template === template.value
-                            ? "text-primary"
-                            : "text-gray-900 dark:text-light-100"
-                        }`}
-                      >
-                        {template.label}
-                      </Text>
-                      <Text className="text-sm text-gray-600 dark:text-light-200 mt-1">
-                        {template.desc}
-                      </Text>
-                    </View>
-                    {project?.writing_template === template.value && (
-                      <Text className="text-primary text-lg">✓</Text>
-                    )}
+              <TouchableOpacity
+                key={template.value}
+                onPress={() => {
+                  applyTemplate(template.value);
+                  setShowTemplateModal(false);
+                }}
+                className={`p-4 rounded-2xl mb-3 border-2 ${
+                  project?.writing_template === template.value
+                    ? "border-primary bg-primary/10"
+                    : "border-gray-200 dark:border-dark-100 bg-light-100 dark:bg-dark-100"
+                }`}
+              >
+                <View className="flex-row items-center">
+                  <Text className="text-2xl mr-3">{template.icon}</Text>
+                  <View className="flex-1">
+                    <Text
+                      className={`font-bold text-base ${
+                        project?.writing_template === template.value
+                          ? "text-primary"
+                          : "text-gray-900 dark:text-light-100"
+                      }`}
+                    >
+                      {template.label}
+                    </Text>
+                    <Text className="text-sm text-gray-600 dark:text-light-200 mt-1">
+                      {template.desc}
+                    </Text>
                   </View>
-                </TouchableOpacity>
-              </View>
+                  {project?.writing_template === template.value && (
+                    <Text className="text-primary text-lg">✓</Text>
+                  )}
+                </View>
+              </TouchableOpacity>
             ))}
 
             <TouchableOpacity
@@ -1380,27 +1155,25 @@ const NovelDetails = () => {
                 { key: "corkboard", label: "Corkboard", icon: "📌" },
                 { key: "outline", label: "Outline", icon: "📋" },
               ].map((view) => (
-                <View key={view.key}>
-                  <TouchableOpacity
-                    key={view.key}
-                    onPress={() => setActiveView(view.key as any)}
-                    className={`px-4 py-2 rounded-full ${
+                <TouchableOpacity
+                  key={view.key}
+                  onPress={() => setActiveView(view.key as any)}
+                  className={`px-4 py-2 rounded-full ${
+                    activeView === view.key
+                      ? "bg-primary"
+                      : "bg-light-100 dark:bg-dark-200"
+                  }`}
+                >
+                  <Text
+                    className={`text-sm font-bold ${
                       activeView === view.key
-                        ? "bg-primary"
-                        : "bg-light-100 dark:bg-dark-200"
+                        ? "text-white"
+                        : "text-gray-600 dark:text-light-200"
                     }`}
                   >
-                    <Text
-                      className={`text-sm font-bold ${
-                        activeView === view.key
-                          ? "text-white"
-                          : "text-gray-600 dark:text-light-200"
-                      }`}
-                    >
-                      {view.icon} {view.label}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                    {view.icon} {view.label}
+                  </Text>
+                </TouchableOpacity>
               ))}
             </View>
           </ScrollView>
@@ -1448,7 +1221,7 @@ const NovelDetails = () => {
           showsVerticalScrollIndicator={false}
         >
           {currentItems.length > 0 ? (
-            renderItemTree(currentItems)
+            <View>{renderItemTree(currentItems)}</View>
           ) : (
             <View className="flex-1 justify-center items-center py-20">
               <Text className="text-6xl mb-4">📝</Text>
@@ -1507,32 +1280,30 @@ const NovelDetails = () => {
                   { value: "note", label: "Note", icon: "📝" },
                   { value: "research", label: "Research", icon: "🔬" },
                 ].map((type) => (
-                  <View key={type.value}>
-                    <TouchableOpacity
-                      key={type.value}
-                      onPress={() =>
-                        setNewItemForm({
-                          ...newItemForm,
-                          itemType: type.value as any,
-                        })
-                      }
-                      className={`px-4 py-2 rounded-full ${
+                  <TouchableOpacity
+                    key={type.value}
+                    onPress={() =>
+                      setNewItemForm({
+                        ...newItemForm,
+                        itemType: type.value as any,
+                      })
+                    }
+                    className={`px-4 py-2 rounded-full ${
+                      newItemForm.itemType === type.value
+                        ? "bg-primary"
+                        : "bg-light-100 dark:bg-dark-100"
+                    }`}
+                  >
+                    <Text
+                      className={`text-sm font-bold ${
                         newItemForm.itemType === type.value
-                          ? "bg-primary"
-                          : "bg-light-100 dark:bg-dark-100"
+                          ? "text-white"
+                          : "text-gray-600 dark:text-light-200"
                       }`}
                     >
-                      <Text
-                        className={`text-sm font-bold ${
-                          newItemForm.itemType === type.value
-                            ? "text-white"
-                            : "text-gray-600 dark:text-light-200"
-                        }`}
-                      >
-                        {type.icon} {type.label}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                      {type.icon} {type.label}
+                    </Text>
+                  </TouchableOpacity>
                 ))}
               </View>
 
@@ -1623,7 +1394,7 @@ const NovelDetails = () => {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Edit Item Modal */}
+      {/* Edit Item Modal with Enhanced Writing Features */}
       <Modal
         visible={!!editingItem}
         animationType="slide"
@@ -1631,10 +1402,12 @@ const NovelDetails = () => {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="flex-1 bg-white dark:bg-dark-300"
+          className="flex-1"
+          style={{ backgroundColor: writingSettings.backgroundColor }}
         >
           <View className="flex-1">
-            <View className="px-6 pt-16 pb-4 border-b border-gray-200 dark:border-dark-100">
+            {/* Editor Header */}
+            <View className="px-6 pt-16 pb-4 border-b border-gray-200 dark:border-dark-100 bg-white dark:bg-dark-300">
               <View className="flex-row items-center justify-between">
                 <TouchableOpacity
                   onPress={() => setEditingItem(null)}
@@ -1642,110 +1415,204 @@ const NovelDetails = () => {
                 >
                   <Text className="text-xl dark:text-light-100">✕</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleSaveEdit}
-                  className="bg-secondary px-6 py-3 rounded-full"
-                >
-                  <Text className="text-gray-900 dark:text-dark-300 font-bold">
-                    Save
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
 
-            <ScrollView
-              className="flex-1 px-6 py-4"
-              showsVerticalScrollIndicator={false}
-            >
-              <TextInput
-                value={editingItem?.name}
-                onChangeText={(text) =>
-                  setEditingItem({ ...editingItem, name: text })
-                }
-                placeholder="Name"
-                placeholderTextColor="#9CA3AF"
-                className="bg-light-100 dark:bg-dark-200 rounded-2xl px-4 py-4 mb-4 text-gray-900 dark:text-light-100 text-lg font-bold"
-              />
-
-              {(editingItem?.item_type === "character" ||
-                editingItem?.item_type === "location") && (
-                <>
+                <View className="flex-row items-center gap-2">
                   <TouchableOpacity
-                    onPress={handlePickEditImage}
-                    className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-4 items-center"
+                    onPress={() => setShowWritingSettings(true)}
+                    className="w-10 h-10 rounded-full bg-light-100 dark:bg-dark-200 justify-center items-center"
                   >
-                    {editingItem?.metadata?.imageUri ? (
-                      <Image
-                        source={{ uri: editingItem.metadata.imageUri }}
-                        className="w-40 h-40 rounded-xl mb-2"
-                      />
-                    ) : (
-                      <View className="w-40 h-40 rounded-xl bg-gray-200 dark:bg-dark-300 justify-center items-center mb-2">
-                        <Text className="text-5xl">
-                          {editingItem?.item_type === "character" ? "👤" : "📍"}
-                        </Text>
-                      </View>
-                    )}
-                    <Text className="text-sm text-primary font-semibold">
-                      {editingItem?.metadata?.imageUri
-                        ? "Change Image"
-                        : "Add Image"}
-                    </Text>
+                    <Text className="text-lg">⚙️</Text>
                   </TouchableOpacity>
 
-                  <TextInput
-                    value={editingItem?.metadata?.description || ""}
-                    onChangeText={(text) =>
-                      setEditingItem({
-                        ...editingItem,
-                        metadata: {
-                          ...editingItem.metadata,
-                          description: text,
-                        },
-                      })
-                    }
-                    placeholder="Description..."
-                    placeholderTextColor="#9CA3AF"
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
-                    className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-4 mb-4 text-gray-900 dark:text-light-100"
-                  />
-                </>
+                  <TouchableOpacity
+                    onPress={() => setIsFocusMode(!isFocusMode)}
+                    className="w-10 h-10 rounded-full bg-light-100 dark:bg-dark-200 justify-center items-center"
+                  >
+                    <Text className="text-lg">{isFocusMode ? "🔍" : "📄"}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleSaveEdit}
+                    className="bg-secondary px-6 py-3 rounded-full"
+                  >
+                    <Text className="text-gray-900 dark:text-dark-300 font-bold">
+                      Save
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {!isFocusMode && (
+                <TextInput
+                  value={editingItem?.name}
+                  onChangeText={(text) =>
+                    setEditingItem({ ...editingItem, name: text })
+                  }
+                  placeholder="Document Title"
+                  placeholderTextColor="#9CA3AF"
+                  className="bg-light-100 dark:bg-dark-200 rounded-2xl px-4 py-4 mt-4 text-gray-900 dark:text-light-100 text-lg font-bold"
+                />
               )}
+            </View>
 
-              {editingItem?.item_type === "document" && (
+            {/* Editor Content */}
+            <ScrollView
+              className="flex-1"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ padding: isFocusMode ? 0 : 24 }}
+            >
+              {isFocusMode ? (
+                // Focus Mode - Full screen writing
+                <TextInput
+                  ref={editorRef}
+                  value={editingItem?.content}
+                  onChangeText={(text) =>
+                    setEditingItem({ ...editingItem, content: text })
+                  }
+                  placeholder="Start writing your story..."
+                  placeholderTextColor="#9CA3AF"
+                  multiline
+                  textAlignVertical="top"
+                  className="flex-1 text-gray-900 dark:text-light-100 p-8"
+                  style={{
+                    fontSize: writingSettings.fontSize,
+                    lineHeight:
+                      writingSettings.fontSize * writingSettings.lineHeight,
+                    fontFamily:
+                      writingSettings.fontFamily === "System"
+                        ? undefined
+                        : writingSettings.fontFamily,
+                    color: writingSettings.textColor,
+                    backgroundColor: writingSettings.backgroundColor,
+                  }}
+                  autoFocus
+                />
+              ) : (
+                // Normal Editor Mode
                 <>
-                  <TextInput
-                    value={editingItem?.content}
-                    onChangeText={(text) =>
-                      setEditingItem({ ...editingItem, content: text })
-                    }
-                    placeholder="Start writing your story..."
-                    placeholderTextColor="#9CA3AF"
-                    multiline
-                    textAlignVertical="top"
-                    className="bg-white dark:bg-dark-200 rounded-2xl px-4 py-4 text-gray-900 dark:text-light-100 text-base leading-7"
-                    style={{ minHeight: 400 }}
-                  />
+                  {(editingItem?.item_type === "character" ||
+                    editingItem?.item_type === "location") && (
+                    <>
+                      <TouchableOpacity
+                        onPress={handlePickEditImage}
+                        className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-4 items-center"
+                      >
+                        {editingItem?.metadata?.imageUri ? (
+                          <Image
+                            source={{ uri: editingItem.metadata.imageUri }}
+                            className="w-40 h-40 rounded-xl mb-2"
+                          />
+                        ) : (
+                          <View className="w-40 h-40 rounded-xl bg-gray-200 dark:bg-dark-300 justify-center items-center mb-2">
+                            <Text className="text-5xl">
+                              {editingItem?.item_type === "character"
+                                ? "👤"
+                                : "📍"}
+                            </Text>
+                          </View>
+                        )}
+                        <Text className="text-sm text-primary font-semibold">
+                          {editingItem?.metadata?.imageUri
+                            ? "Change Image"
+                            : "Add Image"}
+                        </Text>
+                      </TouchableOpacity>
 
-                  <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mt-4">
-                    <View className="flex-row justify-between items-center">
-                      <Text className="text-sm text-gray-600 dark:text-light-200">
-                        Word Count:{" "}
-                        {editingItem?.content
-                          ?.trim()
-                          .split(/\s+/)
-                          .filter(Boolean).length || 0}
-                      </Text>
-                      <Text className="text-sm text-gray-600 dark:text-light-200">
-                        Characters: {editingItem?.content?.length || 0}
-                      </Text>
-                    </View>
-                  </View>
+                      <TextInput
+                        value={editingItem?.metadata?.description || ""}
+                        onChangeText={(text) =>
+                          setEditingItem({
+                            ...editingItem,
+                            metadata: {
+                              ...editingItem.metadata,
+                              description: text,
+                            },
+                          })
+                        }
+                        placeholder="Description..."
+                        placeholderTextColor="#9CA3AF"
+                        multiline
+                        numberOfLines={4}
+                        textAlignVertical="top"
+                        className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-4 mb-4 text-gray-900 dark:text-light-100"
+                      />
+                    </>
+                  )}
+
+                  {editingItem?.item_type === "document" && (
+                    <>
+                      <TextInput
+                        ref={editorRef}
+                        value={editingItem?.content}
+                        onChangeText={(text) =>
+                          setEditingItem({ ...editingItem, content: text })
+                        }
+                        placeholder="Start writing your story..."
+                        placeholderTextColor="#9CA3AF"
+                        multiline
+                        textAlignVertical="top"
+                        className="bg-white dark:bg-dark-200 rounded-2xl px-6 py-6 text-gray-900 dark:text-light-100 text-base leading-7 shadow-sm"
+                        style={{
+                          fontSize: writingSettings.fontSize,
+                          lineHeight:
+                            writingSettings.fontSize *
+                            writingSettings.lineHeight,
+                          fontFamily:
+                            writingSettings.fontFamily === "System"
+                              ? undefined
+                              : writingSettings.fontFamily,
+                          color: writingSettings.textColor,
+                          minHeight: 400,
+                        }}
+                      />
+
+                      <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mt-4">
+                        <View className="flex-row justify-between items-center">
+                          <Text className="text-sm text-gray-600 dark:text-light-200">
+                            Word Count:{" "}
+                            {editingItem?.content
+                              ?.trim()
+                              .split(/\s+/)
+                              .filter(Boolean).length || 0}
+                          </Text>
+                          <Text className="text-sm text-gray-600 dark:text-light-200">
+                            Characters: {editingItem?.content?.length || 0}
+                          </Text>
+                        </View>
+                      </View>
+                    </>
+                  )}
                 </>
               )}
             </ScrollView>
+
+            {/* Writing Stats Bar */}
+            {editingItem?.item_type === "document" && (
+              <View className="bg-white dark:bg-dark-300 border-t border-gray-200 dark:border-dark-100 px-6 py-3">
+                <View className="flex-row justify-between items-center">
+                  <Text className="text-sm text-gray-600 dark:text-light-200">
+                    Words:{" "}
+                    {editingItem?.content?.trim().split(/\s+/).filter(Boolean)
+                      .length || 0}
+                  </Text>
+                  <Text className="text-sm text-gray-600 dark:text-light-200">
+                    Reading Time:{" "}
+                    {Math.ceil(
+                      (editingItem?.content?.trim().split(/\s+/).filter(Boolean)
+                        .length || 0) / 200
+                    )}{" "}
+                    min
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setIsFocusMode(!isFocusMode)}
+                  >
+                    <Text className="text-sm text-primary font-semibold">
+                      {isFocusMode ? "Exit Focus" : "Focus Mode"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -1824,7 +1691,10 @@ const NovelDetails = () => {
       {/* Template Selection Modal */}
       {renderTemplateModal()}
 
-      {/* Book Preview Modal with 3D Page Flip */}
+      {/* Writing Settings Modal */}
+      {renderWritingSettingsModal()}
+
+      {/* Book Preview Modal */}
       <Modal
         visible={showBookPreview}
         animationType="slide"
@@ -1882,7 +1752,7 @@ const NovelDetails = () => {
                   </Text>
                   <ScrollView showsVerticalScrollIndicator={false}>
                     <Text className="text-base text-gray-800 dark:text-light-200 leading-7">
-                      {typeof doc.content === "string" ? doc.content : ""}
+                      {doc.content || ""}
                     </Text>
                   </ScrollView>
                   <Text className="text-xs text-gray-500 dark:text-light-200 text-center mt-4">
