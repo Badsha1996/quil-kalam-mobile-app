@@ -1,6 +1,7 @@
 import { initDB } from "@/utils/database";
 import { Stack } from "expo-router";
 import React, { useEffect } from "react";
+import "react-native-gesture-handler";
 import "./global.css";
 
 export default function RootLayout() {
@@ -12,6 +13,7 @@ export default function RootLayout() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="novel/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="poetry/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="login" options={{ headerShown: false }} />
     </Stack>
   );
 }

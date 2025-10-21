@@ -1,5 +1,6 @@
 import Background from "@/components/common/Background";
 import { templates } from "@/constants/create";
+import { getItemIcon } from "@/constants/novelDetails";
 import {
   structure,
   structure2,
@@ -7,6 +8,7 @@ import {
   structure4,
   structure5,
 } from "@/constants/template";
+import { ItemNode, WritingSettings } from "@/types/novelDetails";
 import {
   createItem,
   deleteItem,
@@ -36,32 +38,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import {
+  RichEditor,
+  RichToolbar,
+  actions,
+} from "react-native-pell-rich-editor";
 
-interface ItemNode {
-  id: number;
-  name: string;
-  item_type: string;
-  content?: string;
-  metadata?: string;
-  parent_item_id?: number;
-  order_index: number;
-  depth_level: number;
-  word_count?: number;
-  color?: string;
-  icon?: string;
-  children?: ItemNode[];
-}
-
-interface WritingSettings {
-  fontSize: number;
-  fontFamily: string;
-  lineHeight: number;
-  textColor: string;
-  backgroundColor: string;
-  paragraphSpacing: number;
-}
-
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
 const NovelDetails = () => {
   const router = useRouter();
@@ -88,8 +71,12 @@ const NovelDetails = () => {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [showWritingSettings, setShowWritingSettings] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
+  const [showStatistics, setShowStatistics] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [typewriterMode, setTypewriterMode] = useState(false);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  const [zenMode, setZenMode] = useState(false);
 
-  // Form states
   const [newItemForm, setNewItemForm] = useState({
     name: "",
     content: "",
@@ -104,19 +91,33 @@ const NovelDetails = () => {
     imageUri: "",
   });
 
-  // Writing settings
   const [writingSettings, setWritingSettings] = useState<WritingSettings>({
-    fontSize: 16,
-    fontFamily: "System",
-    lineHeight: 1.6,
-    textColor: "#000000",
-    backgroundColor: "#ffffff",
-    paragraphSpacing: 12,
+    fontSize: 18,
+    fontFamily: "Georgia",
+    lineHeight: 1.8,
+    textColor: "#1F2937",
+    backgroundColor: "#FFFFFF",
+    paragraphSpacing: 16,
+    textAlign: "left",
+    // @ts-ignore
+    pageWidth: 650,
+    marginTop: 40,
+    marginBottom: 40,
+  });
+
+  const [editorStats, setEditorStats] = useState({
+    wordCount: 0,
+    charCount: 0,
+    paragraphCount: 0,
+    readingTime: 0,
+    sentenceCount: 0,
   });
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const headerHeight = useRef(new Animated.Value(1)).current;
-  const editorRef = useRef<TextInput>(null);
+  const editorRef = useRef<any>(null);
+  const autoSaveTimer = useRef<any>(null);
+  const scrollViewRef = useRef<any>(null);
 
   useEffect(() => {
     loadProjectData();
@@ -128,13 +129,75 @@ const NovelDetails = () => {
     }).start();
   }, [projectId]);
 
+  useEffect(() => {
+    if (autoSaveEnabled && editingItem) {
+      if (autoSaveTimer.current) {
+        clearTimeout(autoSaveTimer.current);
+      }
+      autoSaveTimer.current = setTimeout(() => {
+        handleAutoSave();
+      }, 3000);
+    }
+    return () => {
+      if (autoSaveTimer.current) {
+        clearTimeout(autoSaveTimer.current);
+      }
+    };
+  }, [editingItem?.content, autoSaveEnabled]);
+
+  useEffect(() => {
+    if (editingItem?.content) {
+      calculateEditorStats(editingItem.content);
+    }
+  }, [editingItem?.content]);
+
+  const calculateEditorStats = (html: string) => {
+    const plainText = html.replace(/<[^>]*>/g, "").trim();
+    const words = plainText.split(/\s+/).filter(Boolean);
+    const sentences = plainText.split(/[.!?]+/).filter(Boolean);
+    const paragraphs = plainText.split(/\n\n+/).filter(Boolean);
+
+    setEditorStats({
+      wordCount: words.length,
+      charCount: plainText.length,
+      paragraphCount: paragraphs.length,
+      sentenceCount: sentences.length,
+      readingTime: Math.ceil(words.length / 200),
+    });
+  };
+
+  const handleAutoSave = () => {
+    if (!editingItem) return;
+    try {
+      const updateData: any = {
+        name: editingItem.name,
+        content: editingItem.content,
+        word_count: editorStats.wordCount,
+      };
+
+      if (
+        editingItem.item_type === "character" ||
+        editingItem.item_type === "location"
+      ) {
+        updateData.metadata = {
+          imageUri: editingItem.metadata?.imageUri || "",
+          description: editingItem.metadata?.description || "",
+          ...editingItem.metadata,
+        };
+      }
+
+      updateItem(editingItem.id, updateData);
+      loadProjectData();
+    } catch (error) {
+      console.error("Auto-save failed:", error);
+    }
+  };
+
   const initializeTemplateStructure = () => {
     const projectData = getProject(projectId);
     if (!projectData) return;
 
     const existingItems = getItemsByProject(projectId) as ItemNode[];
-
-    // Check if template structure already exists
     const hasStructure = existingItems.some(
       (item) =>
         item.name.includes("Act") ||
@@ -148,7 +211,6 @@ const NovelDetails = () => {
         )
     );
 
-    // Only apply template if no structure exists and template is not freeform
     if (
       !hasStructure &&
       // @ts-ignore
@@ -168,14 +230,12 @@ const NovelDetails = () => {
     try {
       const existingItems = getItemsByProject(projectId) as ItemNode[];
 
-      // Clear existing structure if requested
       if (clearExisting && existingItems.length > 0) {
         existingItems.forEach((item) => {
           deleteItem(item.id);
         });
       }
 
-      // Apply new template structure
       switch (templateType) {
         case "heros_journey":
           createHerosJourneyStructure();
@@ -193,11 +253,8 @@ const NovelDetails = () => {
           createSnowflakeStructure();
           break;
         default:
-          // Freeform - no structure
           break;
       }
-
-      // Update project with selected template
       // @ts-ignore
       updateProject(projectId, { writing_template: templateType });
       loadProjectData();
@@ -208,7 +265,6 @@ const NovelDetails = () => {
       );
     } catch (error) {
       Alert.alert("Error", "Failed to apply template");
-      console.error("Template application error:", error);
     }
   };
 
@@ -408,20 +464,6 @@ const NovelDetails = () => {
     return folder?.children || [];
   };
 
-  const getItemIcon = (itemType: string): string => {
-    const icons: Record<string, string> = {
-      folder: "📁",
-      document: "📄",
-      character: "👤",
-      location: "📍",
-      note: "📝",
-      research: "🔬",
-      chapter: "📖",
-      scene: "🎬",
-    };
-    return icons[itemType] || "📄";
-  };
-
   const toggleHeaderMinimize = () => {
     const toValue = isHeaderMinimized ? 1 : 0;
     setIsHeaderMinimized(!isHeaderMinimized);
@@ -547,17 +589,6 @@ const NovelDetails = () => {
     }
   };
 
-  const handleBackClick = () => {
-    if (folderPath.length > 0) {
-      const newPath = [...folderPath];
-      newPath.pop();
-      setFolderPath(newPath);
-      setCurrentFolder(
-        newPath.length > 0 ? newPath[newPath.length - 1].id : null
-      );
-    }
-  };
-
   const handleEditItem = (item: ItemNode) => {
     let metadata = {};
     try {
@@ -579,6 +610,7 @@ const NovelDetails = () => {
       const updateData: any = {
         name: editingItem.name,
         content: editingItem.content,
+        word_count: editorStats.wordCount,
       };
 
       if (
@@ -595,6 +627,7 @@ const NovelDetails = () => {
       updateItem(editingItem.id, updateData);
       setEditingItem(null);
       loadProjectData();
+      Alert.alert("Saved", "Changes saved successfully!");
     } catch (error) {
       Alert.alert("Error", "Failed to update item");
     }
@@ -671,179 +704,557 @@ const NovelDetails = () => {
     }));
   };
 
-  const renderWritingSettingsModal = () => (
+  const exportToFormat = (format: "txt" | "html" | "markdown") => {
+    const allDocs = getAllDocuments();
+    let exportContent = "";
+
+    switch (format) {
+      case "txt":
+        exportContent = allDocs
+          .map(
+            (doc) =>
+              `${doc.name}\n\n${doc.content?.replace(/<[^>]*>/g, "") || ""}\n\n`
+          )
+          .join("\n\n---\n\n");
+        break;
+      case "html":
+        exportContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${project.title}</title>
+  <style>
+    body { font-family: Georgia, serif; max-width: 650px; margin: 40px auto; padding: 20px; line-height: 1.8; }
+    h1 { margin-top: 40px; }
+  </style>
+</head>
+<body>
+  <h1>${project.title}</h1>
+  ${project.author_name ? `<p><em>by ${project.author_name}</em></p>` : ""}
+  ${allDocs.map((doc) => `<h2>${doc.name}</h2>${doc.content || ""}`).join("\n")}
+</body>
+</html>`;
+        break;
+      case "markdown":
+        exportContent = `# ${project.title}\n\n${project.author_name ? `*by ${project.author_name}*\n\n` : ""}${allDocs
+          .map(
+            (doc) =>
+              `## ${doc.name}\n\n${doc.content?.replace(/<[^>]*>/g, "") || ""}\n\n`
+          )
+          .join("\n")}`;
+        break;
+    }
+
+    Alert.alert(
+      "Export Ready",
+      `Your ${format.toUpperCase()} export is ready!`,
+      [{ text: "OK" }]
+    );
+    console.log("Export content:", exportContent);
+  };
+
+  const renderWritingSettingsModal = () => {
+    const fontFamilies = [
+      { name: "System", value: "System" },
+      { name: "Georgia", value: "Georgia" },
+      { name: "Times New Roman", value: "Times New Roman" },
+      { name: "Arial", value: "Arial" },
+      { name: "Helvetica", value: "Helvetica" },
+      { name: "Courier New", value: "Courier New" },
+      { name: "Palatino", value: "Palatino" },
+      { name: "Garamond", value: "Garamond" },
+    ];
+
+    const themes = [
+      { name: "Light", bg: "#FFFFFF", text: "#1F2937" },
+      { name: "Dark", bg: "#1F2937", text: "#F3F4F6" },
+      { name: "Sepia", bg: "#F4ECD8", text: "#5C4B37" },
+      { name: "Night", bg: "#0F172A", text: "#E2E8F0" },
+      { name: "Cream", bg: "#FFF8E7", text: "#4A4A4A" },
+      { name: "Solarized", bg: "#FDF6E3", text: "#657B83" },
+    ];
+
+    return (
+      <Modal
+        visible={showWritingSettings}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowWritingSettings(false)}
+      >
+        <View className="flex-1 bg-black/90 justify-center items-center px-4">
+          <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-2xl max-h-[90%]">
+            <View className="flex-row items-center justify-between mb-6">
+              <Text className="text-2xl font-bold text-gray-900 dark:text-light-100">
+                Editor Settings
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowWritingSettings(false)}
+                className="w-8 h-8 rounded-full bg-gray-200 dark:bg-dark-100 justify-center items-center"
+              >
+                <Text className="text-gray-600 dark:text-light-200">✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              className="max-h-[600px]"
+            >
+              <View className="mb-6">
+                <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-3">
+                  Theme Presets
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  className="mb-3"
+                >
+                  <View className="flex-row gap-3">
+                    {themes.map((theme, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        onPress={() => {
+                          updateWritingSetting("backgroundColor", theme.bg);
+                          updateWritingSetting("textColor", theme.text);
+                        }}
+                        className="w-24 h-28 rounded-2xl overflow-hidden border-2 border-gray-300"
+                        style={{ backgroundColor: theme.bg }}
+                      >
+                        <View className="flex-1 p-3">
+                          <View className="h-2 bg-current opacity-60 rounded mb-2" />
+                          <View className="h-1 bg-current opacity-40 rounded mb-1" />
+                          <View className="h-1 bg-current opacity-40 rounded mb-1" />
+                          <View className="h-1 bg-current opacity-40 rounded" />
+                        </View>
+                        <View
+                          className="py-2"
+                          style={{ backgroundColor: theme.bg }}
+                        >
+                          <Text
+                            className="text-xs font-bold text-center"
+                            style={{ color: theme.text }}
+                          >
+                            {theme.name}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+
+              <View className="mb-6">
+                <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-3">
+                  Font Family
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View className="flex-row gap-2">
+                    {fontFamilies.map((font) => (
+                      <TouchableOpacity
+                        key={font.value}
+                        onPress={() =>
+                          updateWritingSetting("fontFamily", font.value)
+                        }
+                        className={`px-5 py-3 rounded-xl ${
+                          writingSettings.fontFamily === font.value
+                            ? "bg-primary"
+                            : "bg-light-100 dark:bg-dark-100"
+                        }`}
+                      >
+                        <Text
+                          className={`text-center font-bold ${
+                            writingSettings.fontFamily === font.value
+                              ? "text-white"
+                              : "text-gray-600 dark:text-light-200"
+                          }`}
+                          style={{
+                            fontFamily:
+                              font.value === "System" ? undefined : font.value,
+                          }}
+                        >
+                          {font.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+
+              <View className="mb-6">
+                <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-3">
+                  Font Size: {writingSettings.fontSize}px
+                </Text>
+                <View className="flex-row gap-2 mb-2">
+                  {[14, 16, 18, 20, 22, 24, 28].map((size) => (
+                    <TouchableOpacity
+                      key={size}
+                      onPress={() => updateWritingSetting("fontSize", size)}
+                      className={`flex-1 py-3 rounded-xl ${
+                        writingSettings.fontSize === size
+                          ? "bg-primary"
+                          : "bg-light-100 dark:bg-dark-100"
+                      }`}
+                    >
+                      <Text
+                        className={`text-center font-bold ${
+                          writingSettings.fontSize === size
+                            ? "text-white"
+                            : "text-gray-600 dark:text-light-200"
+                        }`}
+                        style={{ fontSize: Math.min(size, 20) }}
+                      >
+                        {size}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View className="mb-6">
+                <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-3">
+                  Line Height: {writingSettings.lineHeight}
+                </Text>
+                <View className="flex-row gap-2">
+                  {[1.4, 1.6, 1.8, 2.0, 2.2, 2.5].map((height) => (
+                    <TouchableOpacity
+                      key={height}
+                      onPress={() => updateWritingSetting("lineHeight", height)}
+                      className={`flex-1 py-3 rounded-xl ${
+                        writingSettings.lineHeight === height
+                          ? "bg-primary"
+                          : "bg-light-100 dark:bg-dark-100"
+                      }`}
+                    >
+                      <Text
+                        className={`text-center font-bold ${
+                          writingSettings.lineHeight === height
+                            ? "text-white"
+                            : "text-gray-600 dark:text-light-200"
+                        }`}
+                      >
+                        {height}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View className="mb-6">
+                <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-3">
+                  {/* @ts-ignore */}
+                  Page Width: {writingSettings.pageWidth}px
+                </Text>
+                <View className="flex-row gap-2">
+                  {[600, 650, 700, 800, 900].map((w) => (
+                    <TouchableOpacity
+                      key={w}
+                      // @ts-ignore
+                      onPress={() => updateWritingSetting("pageWidth", w)}
+                      className={`flex-1 py-3 rounded-xl ${
+                        // @ts-ignore
+                        writingSettings.pageWidth === w
+                          ? "bg-primary"
+                          : "bg-light-100 dark:bg-dark-100"
+                      }`}
+                    >
+                      <Text
+                        className={`text-center font-bold ${
+                          // @ts-ignore
+                          writingSettings.pageWidth === w
+                            ? "text-white"
+                            : "text-gray-600 dark:text-light-200"
+                        }`}
+                      >
+                        {w}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View className="mb-6">
+                <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-4">
+                  Editor Modes
+                </Text>
+
+                <TouchableOpacity
+                  onPress={() => setTypewriterMode(!typewriterMode)}
+                  className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-3 flex-row items-center justify-between"
+                >
+                  <View className="flex-row items-center">
+                    <Text className="text-2xl mr-3">⌨️</Text>
+                    <View>
+                      <Text className="text-base font-bold text-gray-900 dark:text-light-100">
+                        Typewriter Mode
+                      </Text>
+                      <Text className="text-xs text-gray-600 dark:text-light-200">
+                        Scrolls text as you type
+                      </Text>
+                    </View>
+                  </View>
+                  <View
+                    className={`w-12 h-7 rounded-full ${typewriterMode ? "bg-primary" : "bg-gray-300"}`}
+                  >
+                    <View
+                      className={`w-5 h-5 rounded-full bg-white mt-1 ${
+                        typewriterMode ? "ml-6" : "ml-1"
+                      }`}
+                    />
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setAutoSaveEnabled(!autoSaveEnabled)}
+                  className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-3 flex-row items-center justify-between"
+                >
+                  <View className="flex-row items-center">
+                    <Text className="text-2xl mr-3">💾</Text>
+                    <View>
+                      <Text className="text-base font-bold text-gray-900 dark:text-light-100">
+                        Auto-Save
+                      </Text>
+                      <Text className="text-xs text-gray-600 dark:text-light-200">
+                        Saves every 3 seconds
+                      </Text>
+                    </View>
+                  </View>
+                  <View
+                    className={`w-12 h-7 rounded-full ${autoSaveEnabled ? "bg-primary" : "bg-gray-300"}`}
+                  >
+                    <View
+                      className={`w-5 h-5 rounded-full bg-white mt-1 ${
+                        autoSaveEnabled ? "ml-6" : "ml-1"
+                      }`}
+                    />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+
+            <View className="flex-row gap-3 mt-4">
+              <TouchableOpacity
+                onPress={() => {
+                  setWritingSettings({
+                    fontSize: 18,
+                    fontFamily: "Georgia",
+                    lineHeight: 1.8,
+                    textColor: "#1F2937",
+                    backgroundColor: "#FFFFFF",
+                    paragraphSpacing: 16,
+                    textAlign: "left",
+                    // @ts-ignore
+                    pageWidth: 650,
+                    marginTop: 40,
+                    marginBottom: 40,
+                  });
+                }}
+                className="flex-1 bg-gray-200 dark:bg-dark-100 py-4 rounded-full"
+              >
+                <Text className="text-gray-700 dark:text-light-200 font-bold text-center">
+                  Reset
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowWritingSettings(false)}
+                className="flex-1 bg-primary py-4 rounded-full"
+              >
+                <Text className="text-white font-bold text-center">Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  const renderStatisticsModal = () => (
     <Modal
-      visible={showWritingSettings}
+      visible={showStatistics}
       transparent
       animationType="slide"
-      onRequestClose={() => setShowWritingSettings(false)}
+      onRequestClose={() => setShowStatistics(false)}
     >
-      <View className="flex-1 bg-black/80 justify-center items-center px-6">
+      <View className="flex-1 bg-black/90 justify-center items-center px-4">
         <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md">
-          <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-6 text-center">
-            Writing Settings
-          </Text>
+          <View className="flex-row items-center justify-between mb-6">
+            <Text className="text-2xl font-bold text-gray-900 dark:text-light-100">
+              Document Statistics
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowStatistics(false)}
+              className="w-8 h-8 rounded-full bg-gray-200 dark:bg-dark-100 justify-center items-center"
+            >
+              <Text className="text-gray-600 dark:text-light-200">✕</Text>
+            </TouchableOpacity>
+          </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            {/* Font Size */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-gray-700 dark:text-light-200 mb-2">
-                Font Size: {writingSettings.fontSize}px
+            <View className="bg-primary rounded-2xl p-4 mb-4">
+              <Text className="text-white text-sm mb-1">Words</Text>
+              <Text className="text-white text-4xl font-bold">
+                {editorStats.wordCount.toLocaleString()}
               </Text>
-              <View className="flex-row gap-2">
-                {[12, 14, 16, 18, 20].map((size) => (
-                  <TouchableOpacity
-                    key={size}
-                    onPress={() => updateWritingSetting("fontSize", size)}
-                    className={`flex-1 py-2 rounded-lg ${
-                      writingSettings.fontSize === size
-                        ? "bg-primary"
-                        : "bg-light-100 dark:bg-dark-100"
-                    }`}
-                  >
-                    <Text
-                      className={`text-center font-bold ${
-                        writingSettings.fontSize === size
-                          ? "text-white"
-                          : "text-gray-600 dark:text-light-200"
-                      }`}
-                    >
-                      {size}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            </View>
+
+            <View className="flex-row gap-3 mb-3">
+              <View className="flex-1 bg-light-100 dark:bg-dark-100 rounded-2xl p-4">
+                <Text className="text-gray-600 dark:text-light-200 text-xs mb-1">
+                  Characters
+                </Text>
+                <Text className="text-gray-900 dark:text-light-100 text-2xl font-bold">
+                  {editorStats.charCount.toLocaleString()}
+                </Text>
+              </View>
+
+              <View className="flex-1 bg-light-100 dark:bg-dark-100 rounded-2xl p-4">
+                <Text className="text-gray-600 dark:text-light-200 text-xs mb-1">
+                  Paragraphs
+                </Text>
+                <Text className="text-gray-900 dark:text-light-100 text-2xl font-bold">
+                  {editorStats.paragraphCount}
+                </Text>
               </View>
             </View>
 
-            {/* Font Family */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-gray-700 dark:text-light-200 mb-2">
-                Font Family
-              </Text>
-              <View className="flex-row flex-wrap gap-2">
-                {["System", "Serif", "Monospace"].map((font) => (
-                  <TouchableOpacity
-                    key={font}
-                    onPress={() => updateWritingSetting("fontFamily", font)}
-                    className={`flex-1 py-2 rounded-lg ${
-                      writingSettings.fontFamily === font
-                        ? "bg-primary"
-                        : "bg-light-100 dark:bg-dark-100"
-                    }`}
-                  >
-                    <Text
-                      className={`text-center font-bold ${
-                        writingSettings.fontFamily === font
-                          ? "text-white"
-                          : "text-gray-600 dark:text-light-200"
-                      }`}
-                    >
-                      {font}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+            <View className="flex-row gap-3 mb-3">
+              <View className="flex-1 bg-light-100 dark:bg-dark-100 rounded-2xl p-4">
+                <Text className="text-gray-600 dark:text-light-200 text-xs mb-1">
+                  Sentences
+                </Text>
+                <Text className="text-gray-900 dark:text-light-100 text-2xl font-bold">
+                  {editorStats.sentenceCount}
+                </Text>
+              </View>
+
+              <View className="flex-1 bg-light-100 dark:bg-dark-100 rounded-2xl p-4">
+                <Text className="text-gray-600 dark:text-light-200 text-xs mb-1">
+                  Reading Time
+                </Text>
+                <Text className="text-gray-900 dark:text-light-100 text-2xl font-bold">
+                  {editorStats.readingTime}m
+                </Text>
               </View>
             </View>
 
-            {/* Text Color */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-gray-700 dark:text-light-200 mb-2">
-                Text Color
+            <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-3">
+              <Text className="text-gray-600 dark:text-light-200 text-sm mb-2">
+                Average Words per Sentence
               </Text>
-              <View className="flex-row flex-wrap gap-2">
-                {[
-                  "#000000",
-                  "#333333",
-                  "#666666",
-                  "#2E4057",
-                  "#8B4513",
-                  "#2F4F4F",
-                ].map((color) => (
-                  <TouchableOpacity
-                    key={color}
-                    onPress={() => updateWritingSetting("textColor", color)}
-                    className="w-10 h-10 rounded-full border-2 border-gray-300"
-                    style={{ backgroundColor: color }}
-                  >
-                    {writingSettings.textColor === color && (
-                      <View className="flex-1 justify-center items-center">
-                        <Text className="text-white text-lg">✓</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <Text className="text-gray-900 dark:text-light-100 text-xl font-bold">
+                {editorStats.sentenceCount > 0
+                  ? (editorStats.wordCount / editorStats.sentenceCount).toFixed(
+                      1
+                    )
+                  : 0}
+              </Text>
             </View>
 
-            {/* Background Color */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-gray-700 dark:text-light-200 mb-2">
-                Background Color
+            <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4">
+              <Text className="text-gray-600 dark:text-light-200 text-sm mb-2">
+                Pages (250 words/page)
               </Text>
-              <View className="flex-row flex-wrap gap-2">
-                {[
-                  "#FFFFFF",
-                  "#F8F9FA",
-                  "#FFF8E1",
-                  "#E8F5E8",
-                  "#E3F2FD",
-                  "#F3E5F5",
-                  "#000000",
-                ].map((color) => (
-                  <TouchableOpacity
-                    key={color}
-                    onPress={() =>
-                      updateWritingSetting("backgroundColor", color)
-                    }
-                    className="w-10 h-10 rounded-full border-2 border-gray-300"
-                    style={{ backgroundColor: color }}
-                  >
-                    {writingSettings.backgroundColor === color && (
-                      <View className="flex-1 justify-center items-center">
-                        <Text className="text-gray-600 text-lg">✓</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* Line Height */}
-            <View className="mb-4">
-              <Text className="text-sm font-semibold text-gray-700 dark:text-light-200 mb-2">
-                Line Height: {writingSettings.lineHeight}
+              <Text className="text-gray-900 dark:text-light-100 text-xl font-bold">
+                {Math.ceil(editorStats.wordCount / 250)}
               </Text>
-              <View className="flex-row gap-2">
-                {[1.2, 1.4, 1.6, 1.8, 2.0].map((height) => (
-                  <TouchableOpacity
-                    key={height}
-                    onPress={() => updateWritingSetting("lineHeight", height)}
-                    className={`flex-1 py-2 rounded-lg ${
-                      writingSettings.lineHeight === height
-                        ? "bg-primary"
-                        : "bg-light-100 dark:bg-dark-100"
-                    }`}
-                  >
-                    <Text
-                      className={`text-center font-bold ${
-                        writingSettings.lineHeight === height
-                          ? "text-white"
-                          : "text-gray-600 dark:text-light-200"
-                      }`}
-                    >
-                      {height}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
             </View>
           </ScrollView>
 
           <TouchableOpacity
-            onPress={() => setShowWritingSettings(false)}
+            onPress={() => setShowStatistics(false)}
             className="bg-primary py-4 rounded-full mt-4"
           >
-            <Text className="text-white font-bold text-center">Apply</Text>
+            <Text className="text-white font-bold text-center">Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderExportModal = () => (
+    <Modal
+      visible={showExportModal}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setShowExportModal(false)}
+    >
+      <View className="flex-1 bg-black/90 justify-center items-center px-4">
+        <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md">
+          <View className="flex-row items-center justify-between mb-6">
+            <Text className="text-2xl font-bold text-gray-900 dark:text-light-100">
+              Export Project
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowExportModal(false)}
+              className="w-8 h-8 rounded-full bg-gray-200 dark:bg-dark-100 justify-center items-center"
+            >
+              <Text className="text-gray-600 dark:text-light-200">✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text className="text-sm text-gray-600 dark:text-light-200 mb-4">
+            Choose your export format
+          </Text>
+
+          <TouchableOpacity
+            onPress={() => {
+              exportToFormat("txt");
+              setShowExportModal(false);
+            }}
+            className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-3 flex-row items-center"
+          >
+            <Text className="text-3xl mr-4">📄</Text>
+            <View className="flex-1">
+              <Text className="text-base font-bold text-gray-900 dark:text-light-100">
+                Plain Text (.txt)
+              </Text>
+              <Text className="text-xs text-gray-600 dark:text-light-200">
+                Simple text file, no formatting
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              exportToFormat("html");
+              setShowExportModal(false);
+            }}
+            className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-3 flex-row items-center"
+          >
+            <Text className="text-3xl mr-4">🌐</Text>
+            <View className="flex-1">
+              <Text className="text-base font-bold text-gray-900 dark:text-light-100">
+                HTML (.html)
+              </Text>
+              <Text className="text-xs text-gray-600 dark:text-light-200">
+                Web page with formatting
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              exportToFormat("markdown");
+              setShowExportModal(false);
+            }}
+            className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-3 flex-row items-center"
+          >
+            <Text className="text-3xl mr-4">📝</Text>
+            <View className="flex-1">
+              <Text className="text-base font-bold text-gray-900 dark:text-light-100">
+                Markdown (.md)
+              </Text>
+              <Text className="text-xs text-gray-600 dark:text-light-200">
+                Markdown formatted text
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => setShowExportModal(false)}
+            className="bg-gray-200 dark:bg-dark-100 py-4 rounded-full mt-2"
+          >
+            <Text className="text-gray-700 dark:text-light-200 font-bold text-center">
+              Cancel
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -864,16 +1275,16 @@ const NovelDetails = () => {
           <TouchableOpacity
             onPress={() => handleFolderClick(item)}
             onLongPress={() => handleDeleteItem(item)}
-            className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-2 shadow-sm"
-            style={{ marginLeft: depth * 20 }}
+            className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-3 shadow-sm"
+            style={{ marginLeft: depth * 16 }}
           >
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center flex-1">
                 <View
-                  className="w-10 h-10 rounded-xl justify-center items-center mr-3"
+                  className="w-12 h-12 rounded-xl justify-center items-center mr-3"
                   style={{ backgroundColor: item.color || "#F3F4F6" }}
                 >
-                  <Text className="text-xl">{String(safeIcon)}</Text>
+                  <Text className="text-2xl">{String(safeIcon)}</Text>
                 </View>
                 <View className="flex-1">
                   <Text
@@ -888,7 +1299,7 @@ const NovelDetails = () => {
                     </Text>
                     {item.word_count !== undefined && item.word_count > 0 ? (
                       <Text className="text-xs text-gray-500 dark:text-light-200">
-                        • {item.word_count} words
+                        • {item.word_count.toLocaleString()} words
                       </Text>
                     ) : null}
                   </View>
@@ -896,8 +1307,8 @@ const NovelDetails = () => {
               </View>
               {(item.item_type === "folder" ||
                 item.item_type === "chapter") && (
-                <Text className="text-gray-400 dark:text-light-200 text-xl">
-                  {"›"}
+                <Text className="text-gray-400 dark:text-light-200 text-2xl">
+                  ›
                 </Text>
               )}
             </View>
@@ -923,19 +1334,21 @@ const NovelDetails = () => {
       </TouchableOpacity>
 
       <TouchableOpacity
-        onPress={() => setShowCoverModal(true)}
+        onPress={() => setShowExportModal(true)}
         className="bg-white dark:bg-dark-200 px-4 py-2 rounded-full shadow-lg"
       >
         <Text className="text-sm font-bold text-gray-900 dark:text-light-100">
-          📚 Cover
+          📤 Export
         </Text>
       </TouchableOpacity>
+
       <TouchableOpacity
         onPress={() => setShowBookPreview(true)}
         className="bg-primary px-4 py-2 rounded-full shadow-lg"
       >
         <Text className="text-sm font-bold text-white">👁️ Preview</Text>
       </TouchableOpacity>
+
       <TouchableOpacity
         onPress={toggleHeaderMinimize}
         className="w-10 h-10 rounded-full bg-white dark:bg-dark-200 justify-center items-center shadow-lg"
@@ -954,7 +1367,7 @@ const NovelDetails = () => {
       animationType="fade"
       onRequestClose={() => setShowTemplateModal(false)}
     >
-      <View className="flex-1 bg-black/80 justify-center items-center px-6">
+      <View className="flex-1 bg-black/90 justify-center items-center px-6">
         <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md max-h-[80%]">
           <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-4 text-center">
             Choose Writing Template
@@ -979,7 +1392,7 @@ const NovelDetails = () => {
                 }`}
               >
                 <View className="flex-row items-center">
-                  <Text className="text-2xl mr-3">{template.icon}</Text>
+                  <Text className="text-3xl mr-3">{template.icon}</Text>
                   <View className="flex-1">
                     <Text
                       className={`font-bold text-base ${
@@ -995,7 +1408,7 @@ const NovelDetails = () => {
                     </Text>
                   </View>
                   {project?.writing_template === template.value && (
-                    <Text className="text-primary text-lg">✓</Text>
+                    <Text className="text-primary text-2xl">✓</Text>
                   )}
                 </View>
               </TouchableOpacity>
@@ -1036,7 +1449,6 @@ const NovelDetails = () => {
   return (
     <Background>
       <View className="flex-1">
-        {/* Collapsible Header */}
         <Animated.View
           style={{
             height: headerHeight.interpolate({
@@ -1102,7 +1514,6 @@ const NovelDetails = () => {
                   </View>
                 </View>
 
-                {/* Stats Grid */}
                 <View className="flex-row flex-wrap gap-3 mb-4">
                   <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-3 flex-1 min-w-[45%]">
                     <Text className="text-xs text-gray-600 dark:text-light-200 mb-1">
@@ -1122,7 +1533,6 @@ const NovelDetails = () => {
                   </View>
                 </View>
 
-                {/* Progress Bar */}
                 {project.target_word_count > 0 && (
                   <View>
                     <View className="flex-row justify-between mb-2">
@@ -1146,7 +1556,6 @@ const NovelDetails = () => {
           </View>
         </Animated.View>
 
-        {/* View Switcher */}
         <View className="px-6 py-3 border-b border-gray-200 dark:border-dark-100">
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View className="flex-row gap-2">
@@ -1179,7 +1588,6 @@ const NovelDetails = () => {
           </ScrollView>
         </View>
 
-        {/* Breadcrumb */}
         {folderPath.length > 0 && (
           <View className="px-6 py-2 bg-light-100 dark:bg-dark-100">
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -1215,7 +1623,6 @@ const NovelDetails = () => {
           </View>
         )}
 
-        {/* Content Area */}
         <ScrollView
           className="flex-1 px-6 py-4"
           showsVerticalScrollIndicator={false}
@@ -1235,7 +1642,6 @@ const NovelDetails = () => {
           )}
         </ScrollView>
 
-        {/* Floating Add Button */}
         <TouchableOpacity
           onPress={() => setShowAddModal(true)}
           className="absolute bottom-6 right-6 w-16 h-16 bg-secondary rounded-full justify-center items-center shadow-xl"
@@ -1251,7 +1657,6 @@ const NovelDetails = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Add Item Modal */}
       <Modal
         visible={showAddModal}
         transparent
@@ -1394,21 +1799,22 @@ const NovelDetails = () => {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Edit Item Modal with Enhanced Writing Features */}
       <Modal
         visible={!!editingItem}
         animationType="slide"
         onRequestClose={() => setEditingItem(null)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        <View
           className="flex-1"
-          style={{ backgroundColor: writingSettings.backgroundColor }}
+          style={{
+            backgroundColor: zenMode
+              ? writingSettings.backgroundColor
+              : "#F9FAFB",
+          }}
         >
-          <View className="flex-1">
-            {/* Editor Header */}
+          {!zenMode && (
             <View className="px-6 pt-16 pb-4 border-b border-gray-200 dark:border-dark-100 bg-white dark:bg-dark-300">
-              <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center justify-between mb-4">
                 <TouchableOpacity
                   onPress={() => setEditingItem(null)}
                   className="w-10 h-10 rounded-full bg-light-100 dark:bg-dark-200 justify-center items-center"
@@ -1417,6 +1823,13 @@ const NovelDetails = () => {
                 </TouchableOpacity>
 
                 <View className="flex-row items-center gap-2">
+                  <TouchableOpacity
+                    onPress={() => setShowStatistics(true)}
+                    className="w-10 h-10 rounded-full bg-light-100 dark:bg-dark-200 justify-center items-center"
+                  >
+                    <Text className="text-lg">📊</Text>
+                  </TouchableOpacity>
+
                   <TouchableOpacity
                     onPress={() => setShowWritingSettings(true)}
                     className="w-10 h-10 rounded-full bg-light-100 dark:bg-dark-200 justify-center items-center"
@@ -1432,192 +1845,243 @@ const NovelDetails = () => {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    onPress={handleSaveEdit}
-                    className="bg-secondary px-6 py-3 rounded-full"
+                    onPress={() => setZenMode(!zenMode)}
+                    className="w-10 h-10 rounded-full bg-light-100 dark:bg-dark-200 justify-center items-center"
                   >
-                    <Text className="text-gray-900 dark:text-dark-300 font-bold">
-                      Save
+                    <Text className="text-lg">🧘</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleSaveEdit}
+                    className="bg-secondary px-4 py-2 rounded-full"
+                  >
+                    <Text className="text-gray-900 dark:text-dark-300 font-bold text-sm">
+                      💾 Save
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
 
               {!isFocusMode && (
-                <TextInput
-                  value={editingItem?.name}
-                  onChangeText={(text) =>
-                    setEditingItem({ ...editingItem, name: text })
-                  }
-                  placeholder="Document Title"
-                  placeholderTextColor="#9CA3AF"
-                  className="bg-light-100 dark:bg-dark-200 rounded-2xl px-4 py-4 mt-4 text-gray-900 dark:text-light-100 text-lg font-bold"
-                />
+                <View className="flex-row items-center gap-2">
+                  <TextInput
+                    value={editingItem?.name}
+                    onChangeText={(text) =>
+                      setEditingItem({ ...editingItem, name: text })
+                    }
+                    placeholder="Document Title"
+                    placeholderTextColor="#9CA3AF"
+                    className="flex-1 bg-light-100 dark:bg-dark-200 rounded-2xl px-4 py-3 text-gray-900 dark:text-light-100 text-lg font-bold"
+                  />
+                </View>
+              )}
+
+              {autoSaveEnabled && (
+                <View className="mt-2">
+                  <Text className="text-xs text-gray-500 dark:text-light-200 text-center">
+                    ✓ Auto-save enabled
+                  </Text>
+                </View>
               )}
             </View>
+          )}
 
-            {/* Editor Content */}
-            <ScrollView
-              className="flex-1"
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ padding: isFocusMode ? 0 : 24 }}
+          {zenMode && (
+            <TouchableOpacity
+              onPress={() => setZenMode(false)}
+              className="absolute top-12 right-6 z-50 w-10 h-10 rounded-full bg-black/20 justify-center items-center"
             >
-              {isFocusMode ? (
-                // Focus Mode - Full screen writing
+              <Text className="text-white text-lg">✕</Text>
+            </TouchableOpacity>
+          )}
+
+          <View className="flex-1">
+            {(editingItem?.item_type === "character" ||
+              editingItem?.item_type === "location") && (
+              <>
+                <TouchableOpacity
+                  onPress={handlePickEditImage}
+                  className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-4 items-center mx-4 mt-4"
+                >
+                  {editingItem?.metadata?.imageUri ? (
+                    <Image
+                      source={{ uri: editingItem.metadata.imageUri }}
+                      className="w-40 h-40 rounded-xl mb-2"
+                    />
+                  ) : (
+                    <View className="w-40 h-40 rounded-xl bg-gray-200 dark:bg-dark-300 justify-center items-center mb-2">
+                      <Text className="text-5xl">
+                        {editingItem?.item_type === "character" ? "👤" : "📍"}
+                      </Text>
+                    </View>
+                  )}
+                  <Text className="text-sm text-primary font-semibold">
+                    {editingItem?.metadata?.imageUri
+                      ? "Change Image"
+                      : "Add Image"}
+                  </Text>
+                </TouchableOpacity>
+
                 <TextInput
-                  ref={editorRef}
-                  value={editingItem?.content}
+                  value={editingItem?.metadata?.description || ""}
                   onChangeText={(text) =>
-                    setEditingItem({ ...editingItem, content: text })
+                    setEditingItem({
+                      ...editingItem,
+                      metadata: {
+                        ...editingItem.metadata,
+                        description: text,
+                      },
+                    })
                   }
-                  placeholder="Start writing your story..."
+                  placeholder="Description..."
                   placeholderTextColor="#9CA3AF"
                   multiline
+                  numberOfLines={4}
                   textAlignVertical="top"
-                  className="flex-1 text-gray-900 dark:text-light-100 p-8"
-                  style={{
-                    fontSize: writingSettings.fontSize,
-                    lineHeight:
-                      writingSettings.fontSize * writingSettings.lineHeight,
-                    fontFamily:
-                      writingSettings.fontFamily === "System"
-                        ? undefined
-                        : writingSettings.fontFamily,
-                    color: writingSettings.textColor,
-                    backgroundColor: writingSettings.backgroundColor,
-                  }}
-                  autoFocus
+                  className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-4 mx-4 mb-4 text-gray-900 dark:text-light-100"
                 />
-              ) : (
-                // Normal Editor Mode
-                <>
-                  {(editingItem?.item_type === "character" ||
-                    editingItem?.item_type === "location") && (
-                    <>
-                      <TouchableOpacity
-                        onPress={handlePickEditImage}
-                        className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-4 items-center"
-                      >
-                        {editingItem?.metadata?.imageUri ? (
-                          <Image
-                            source={{ uri: editingItem.metadata.imageUri }}
-                            className="w-40 h-40 rounded-xl mb-2"
-                          />
-                        ) : (
-                          <View className="w-40 h-40 rounded-xl bg-gray-200 dark:bg-dark-300 justify-center items-center mb-2">
-                            <Text className="text-5xl">
-                              {editingItem?.item_type === "character"
-                                ? "👤"
-                                : "📍"}
-                            </Text>
-                          </View>
-                        )}
-                        <Text className="text-sm text-primary font-semibold">
-                          {editingItem?.metadata?.imageUri
-                            ? "Change Image"
-                            : "Add Image"}
-                        </Text>
-                      </TouchableOpacity>
+              </>
+            )}
 
-                      <TextInput
-                        value={editingItem?.metadata?.description || ""}
-                        onChangeText={(text) =>
-                          setEditingItem({
-                            ...editingItem,
-                            metadata: {
-                              ...editingItem.metadata,
-                              description: text,
-                            },
-                          })
-                        }
-                        placeholder="Description..."
-                        placeholderTextColor="#9CA3AF"
-                        multiline
-                        numberOfLines={4}
-                        textAlignVertical="top"
-                        className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-4 mb-4 text-gray-900 dark:text-light-100"
-                      />
-                    </>
-                  )}
-
-                  {editingItem?.item_type === "document" && (
-                    <>
-                      <TextInput
-                        ref={editorRef}
-                        value={editingItem?.content}
-                        onChangeText={(text) =>
-                          setEditingItem({ ...editingItem, content: text })
-                        }
-                        placeholder="Start writing your story..."
-                        placeholderTextColor="#9CA3AF"
-                        multiline
-                        textAlignVertical="top"
-                        className="bg-white dark:bg-dark-200 rounded-2xl px-6 py-6 text-gray-900 dark:text-light-100 text-base leading-7 shadow-sm"
-                        style={{
-                          fontSize: writingSettings.fontSize,
-                          lineHeight:
-                            writingSettings.fontSize *
-                            writingSettings.lineHeight,
-                          fontFamily:
-                            writingSettings.fontFamily === "System"
-                              ? undefined
-                              : writingSettings.fontFamily,
-                          color: writingSettings.textColor,
-                          minHeight: 400,
-                        }}
-                      />
-
-                      <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mt-4">
-                        <View className="flex-row justify-between items-center">
-                          <Text className="text-sm text-gray-600 dark:text-light-200">
-                            Word Count:{" "}
-                            {editingItem?.content
-                              ?.trim()
-                              .split(/\s+/)
-                              .filter(Boolean).length || 0}
-                          </Text>
-                          <Text className="text-sm text-gray-600 dark:text-light-200">
-                            Characters: {editingItem?.content?.length || 0}
-                          </Text>
-                        </View>
-                      </View>
-                    </>
-                  )}
-                </>
-              )}
-            </ScrollView>
-
-            {/* Writing Stats Bar */}
             {editingItem?.item_type === "document" && (
-              <View className="bg-white dark:bg-dark-300 border-t border-gray-200 dark:border-dark-100 px-6 py-3">
-                <View className="flex-row justify-between items-center">
-                  <Text className="text-sm text-gray-600 dark:text-light-200">
-                    Words:{" "}
-                    {editingItem?.content?.trim().split(/\s+/).filter(Boolean)
-                      .length || 0}
-                  </Text>
-                  <Text className="text-sm text-gray-600 dark:text-light-200">
-                    Reading Time:{" "}
-                    {Math.ceil(
-                      (editingItem?.content?.trim().split(/\s+/).filter(Boolean)
-                        .length || 0) / 200
-                    )}{" "}
-                    min
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => setIsFocusMode(!isFocusMode)}
+              <View className="flex-1">
+                {!isFocusMode && !zenMode && (
+                  <RichToolbar
+                    editor={editorRef}
+                    actions={[
+                      actions.setBold,
+                      actions.setItalic,
+                      actions.setUnderline,
+                      actions.heading1,
+                      actions.heading2,
+                      actions.insertBulletsList,
+                      actions.insertOrderedList,
+                      actions.blockquote,
+                      actions.alignLeft,
+                      actions.alignCenter,
+                      actions.code,
+                      actions.undo,
+                      actions.redo,
+                    ]}
+                    iconMap={{
+                      // @ts-ignore
+                      [actions.setBold]: ({ tintColor }) => (
+                        <Text
+                          style={{
+                            color: tintColor,
+                            fontWeight: "bold",
+                            fontSize: 16,
+                          }}
+                        >
+                          B
+                        </Text>
+                      ), // @ts-ignore
+                      [actions.setItalic]: ({ tintColor }) => (
+                        <Text
+                          style={{
+                            color: tintColor,
+                            fontStyle: "italic",
+                            fontSize: 16,
+                          }}
+                        >
+                          I
+                        </Text>
+                      ), // @ts-ignore
+                      [actions.setUnderline]: ({ tintColor }) => (
+                        <Text
+                          style={{
+                            color: tintColor,
+                            textDecorationLine: "underline",
+                            fontSize: 16,
+                          }}
+                        >
+                          U
+                        </Text>
+                      ),
+                    }}
+                    style={{
+                      backgroundColor: "#fff",
+                      borderBottomWidth: 1,
+                      borderBottomColor: "#e5e5e5",
+                      minHeight: 50,
+                    }}
+                  />
+                )}
+
+                <ScrollView
+                  ref={scrollViewRef}
+                  className="flex-1"
+                  contentContainerStyle={{
+                    paddingHorizontal: 20,
+                    paddingVertical: zenMode ? 60 : 20,
+                    alignItems: "center",
+                  }}
+                  style={{ backgroundColor: writingSettings.backgroundColor }}
+                >
+                  <View
+                    style={{
+                      width: zenMode // @ts-ignore
+                        ? Math.min(writingSettings.pageWidth, width - 40)
+                        : "100%", // @ts-ignore
+                      maxWidth: writingSettings.pageWidth,
+                    }}
                   >
-                    <Text className="text-sm text-primary font-semibold">
-                      {isFocusMode ? "Exit Focus" : "Focus Mode"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                    <RichEditor
+                      ref={editorRef}
+                      initialContentHTML={editingItem?.content || ""}
+                      onChange={(html) => {
+                        setEditingItem({ ...editingItem, content: html });
+                      }}
+                      placeholder="Start writing your story..."
+                      style={{
+                        flex: 1,
+                        minHeight: height - 200,
+                        backgroundColor: writingSettings.backgroundColor,
+                      }}
+                      editorStyle={{
+                        backgroundColor: writingSettings.backgroundColor,
+                        color: writingSettings.textColor,
+                        // @ts-ignore
+                        fontSize: writingSettings.fontSize,
+                        lineHeight: writingSettings.lineHeight,
+                        fontFamily:
+                          writingSettings.fontFamily === "System"
+                            ? undefined
+                            : writingSettings.fontFamily,
+                        padding: zenMode ? 40 : 16,
+                        textAlign: writingSettings.textAlign || "left",
+                      }}
+                      useContainer={true}
+                    />
+                  </View>
+                </ScrollView>
               </View>
             )}
           </View>
-        </KeyboardAvoidingView>
+
+          {editingItem?.item_type === "document" && !zenMode && (
+            <View className="bg-white dark:bg-dark-300 border-t border-gray-200 dark:border-dark-100 px-6 py-3">
+              <View className="flex-row justify-between items-center">
+                <Text className="text-sm text-gray-600 dark:text-light-200">
+                  Words: {editorStats.wordCount.toLocaleString()}
+                </Text>
+                <Text className="text-sm text-gray-600 dark:text-light-200">
+                  Characters: {editorStats.charCount.toLocaleString()}
+                </Text>
+                <Text className="text-sm text-gray-600 dark:text-light-200">
+                  Reading: {editorStats.readingTime}m
+                </Text>
+                <TouchableOpacity onPress={() => setZenMode(!zenMode)}>
+                  <Text className="text-sm text-primary font-semibold">
+                    Zen Mode
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
       </Modal>
 
-      {/* Book Cover Modal */}
       <Modal
         visible={showCoverModal}
         transparent
@@ -1688,13 +2152,11 @@ const NovelDetails = () => {
         </View>
       </Modal>
 
-      {/* Template Selection Modal */}
       {renderTemplateModal()}
-
-      {/* Writing Settings Modal */}
       {renderWritingSettingsModal()}
+      {renderStatisticsModal()}
+      {renderExportModal()}
 
-      {/* Book Preview Modal */}
       <Modal
         visible={showBookPreview}
         animationType="slide"
@@ -1724,7 +2186,6 @@ const NovelDetails = () => {
             }}
             scrollEventThrottle={16}
           >
-            {/* Front Cover */}
             {frontCover && (
               <View className="items-center justify-center" style={{ width }}>
                 <Image
@@ -1736,7 +2197,6 @@ const NovelDetails = () => {
               </View>
             )}
 
-            {/* Content Pages */}
             {allDocs.map((doc, index) => (
               <View
                 key={doc.id}
@@ -1745,15 +2205,29 @@ const NovelDetails = () => {
               >
                 <View
                   className="bg-white dark:bg-dark-200 rounded-2xl p-6 shadow-2xl"
-                  style={{ height: width * 1.2 }}
+                  style={{ height: width * 1.5 }}
                 >
                   <Text className="text-xl font-bold text-gray-900 dark:text-light-100 mb-4">
                     {doc.name}
                   </Text>
                   <ScrollView showsVerticalScrollIndicator={false}>
-                    <Text className="text-base text-gray-800 dark:text-light-200 leading-7">
-                      {doc.content || ""}
-                    </Text>
+                    <RichEditor
+                      disabled={true}
+                      initialContentHTML={doc.content || ""}
+                      style={{
+                        flex: 1,
+                        minHeight: 400,
+                        backgroundColor: String(
+                          writingSettings.backgroundColor
+                        ),
+                      }}
+                      editorStyle={{
+                        color: String(writingSettings.textColor),
+                        backgroundColor: String(
+                          writingSettings.backgroundColor
+                        ),
+                      }}
+                    />
                   </ScrollView>
                   <Text className="text-xs text-gray-500 dark:text-light-200 text-center mt-4">
                     Page {index + 1}
@@ -1762,7 +2236,6 @@ const NovelDetails = () => {
               </View>
             ))}
 
-            {/* Back Cover */}
             {backCover && (
               <View className="items-center justify-center" style={{ width }}>
                 <Image
@@ -1775,7 +2248,6 @@ const NovelDetails = () => {
             )}
           </ScrollView>
 
-          {/* Page Indicator */}
           <View className="absolute bottom-8 left-0 right-0 items-center">
             <View className="bg-black/50 px-6 py-3 rounded-full">
               <Text className="text-white font-bold">

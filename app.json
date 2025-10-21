@@ -8,6 +8,10 @@
     "scheme": "quilkalam",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "typescript": {
+      "noEmit": false,
+      "skipLibCheck": true
+    },
     "ios": {
       "supportsTablet": true,
       "splash": {
@@ -32,7 +36,9 @@
         "xxxhdpi": "./assets/images/transparent-bg.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.quilkalam.myapp",
+      "permissions": ["android.permission.RECORD_AUDIO"]
     },
     "web": {
       "output": "static",
@@ -61,6 +67,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cb978d09-49f7-4a75-a970-654bb24dd748"
+      }
     }
   }
 }
