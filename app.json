@@ -4,36 +4,32 @@
     "slug": "quilkalam",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/solid-bg.jpg",
+    "icon": "./assets/images/solid-bg.png",
     "scheme": "quilkalam",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "typescript": {
-      "noEmit": false,
-      "skipLibCheck": true
-    },
     "ios": {
       "supportsTablet": true,
       "splash": {
-        "image": "./assets/images/transparent-bg.png",
+        "image": "./assets/images/solid-bg.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff"
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/transparent-bg.png",
+        "foregroundImage": "./assets/images/solid-bg.png",
         "backgroundColor": "#ffffff"
       },
       "splash": {
-        "image": "./assets/images/transparent-bg.png",
+        "image": "./assets/images/solid-bg.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff",
-        "mdpi": "./assets/images/transparent-bg.png",
-        "hdpi": "./assets/images/transparent-bg.png",
-        "xhdpi": "./assets/images/transparent-bg.png",
-        "xxhdpi": "./assets/images/transparent-bg.png",
-        "xxxhdpi": "./assets/images/transparent-bg.png"
+        "mdpi": "./assets/images/solid-bg.png",
+        "hdpi": "./assets/images/solid-bg.png",
+        "xhdpi": "./assets/images/solid-bg.png",
+        "xxhdpi": "./assets/images/solid-bg.png",
+        "xxxhdpi": "./assets/images/solid-bg.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -43,7 +39,7 @@
     "web": {
       "output": "static",
       "bundler": "metro",
-      "favicon": "./assets/images/transparent-bg.png"
+      "favicon": "./assets/images/solid-bg.png"
     },
     "plugins": [
       [
@@ -56,7 +52,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/transparent-bg.png",
+          "image": "./assets/images/solid-bg.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
