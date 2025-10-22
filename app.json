@@ -34,7 +34,10 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.quilkalam.myapp",
-      "permissions": ["android.permission.RECORD_AUDIO"]
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -69,6 +72,12 @@
       "eas": {
         "projectId": "cb978d09-49f7-4a75-a970-654bb24dd748"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/cb978d09-49f7-4a75-a970-654bb24dd748"
     }
   }
 }

@@ -7,21 +7,25 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
+      "node": "20.18.1"
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "node": "20.18.1",
+      "env": {
+        "NODE_ENV": "production"
       }
     },
     "production": {
       "autoIncrement": true,
-      "android": {
-        "buildType": "app-bundle"
-      }
+      "node": "20.18.1",
+      "env": {
+        "NODE_ENV": "production"
+      },
+      "channel": "production"
     }
   },
   "submit": {
