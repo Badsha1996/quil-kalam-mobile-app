@@ -35,7 +35,6 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.quilkalam.myapp",
       "permissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
       ]
     },
@@ -63,10 +62,6 @@
       ],
       "expo-sqlite"
     ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    },
     "extra": {
       "router": {},
       "eas": {
