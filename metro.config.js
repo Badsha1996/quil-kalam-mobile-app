@@ -3,4 +3,14 @@ const { withNativeWind } = require("nativewind/metro");
 
 const config = getDefaultConfig(__dirname);
 
-module.exports = withNativeWind(config);
+// Optimize for production builds
+config.transformer.minifierConfig = {
+  compress: {
+    drop_console: true,
+  },
+};
+
+module.exports = withNativeWind(config, {
+  input: "./app/global.css",
+  inlineRem: false,
+});
