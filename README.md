@@ -1,6 +1,6 @@
 # QuilKalam Mobile App
 <p align="center">
-  <img src="./assets/images/transparent-bg.png" alt="QuilKalam Logo" width="300"/>
+  <img src="./assets/images/quilkalam-logo.png" alt="QuilKalam Logo" width="300"/>
 </p>
 
 QuilKalam is a mobile application for writers and readers, providing an intuitive platform to write, organize, and share stories. Built with [Expo](https://expo.dev/), [React Native](https://reactnative.dev/), [NativeWind](https://www.nativewind.dev/), and [Tailwind CSS](https://tailwindcss.com/), it offers a modern, animated, and responsive user experience.
