@@ -25,9 +25,9 @@ const AuthScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   const validatePhoneNumber = (phone: string) => {
-    // Basic validation - adjust for your region
-    const phoneRegex = /^[+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/;
-    return phoneRegex.test(phone.replace(/\s/g, ''));
+    // More flexible phone number validation
+    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$|^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
+    return phoneRegex.test(phone.replace(/[\s\-\(\)\.]/g, ''));
   };
 
   const validatePassword = (pass: string) => {
@@ -98,7 +98,7 @@ const AuthScreen = () => {
   const handleSkip = () => {
     Alert.alert(
       "Continue as Guest?",
-      "You can still create and manage projects locally, but you won't be able to publish online or sync across devices.",
+      "You can still create and manage projects locally, but your profile and settings won't be saved permanently.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -107,6 +107,26 @@ const AuthScreen = () => {
         },
       ]
     );
+  };
+
+  // Format phone number as user types
+  const formatPhoneNumber = (text: string) => {
+    // Remove all non-digit characters
+    const cleaned = text.replace(/\D/g, '');
+    
+    // Format based on length
+    if (cleaned.length <= 3) {
+      return cleaned;
+    } else if (cleaned.length <= 6) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+    } else {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+    }
+  };
+
+  const handlePhoneNumberChange = (text: string) => {
+    const formatted = formatPhoneNumber(text);
+    setPhoneNumber(formatted);
   };
 
   return (
@@ -189,6 +209,7 @@ const AuthScreen = () => {
                         placeholderTextColor="#9CA3AF"
                         className="flex-1 text-gray-900 dark:text-light-100"
                         autoCapitalize="words"
+                        editable={!loading}
                       />
                     </View>
                   </View>
@@ -202,11 +223,12 @@ const AuthScreen = () => {
                     <Text className="text-xl mr-2">📱</Text>
                     <TextInput
                       value={phoneNumber}
-                      onChangeText={setPhoneNumber}
-                      placeholder="+1 (555) 123-4567"
+                      onChangeText={handlePhoneNumberChange}
+                      placeholder="(555) 123-4567"
                       placeholderTextColor="#9CA3AF"
                       keyboardType="phone-pad"
                       className="flex-1 text-gray-900 dark:text-light-100"
+                      editable={!loading}
                     />
                   </View>
                 </View>
@@ -224,8 +246,12 @@ const AuthScreen = () => {
                       placeholderTextColor="#9CA3AF"
                       secureTextEntry={!showPassword}
                       className="flex-1 text-gray-900 dark:text-light-100"
+                      editable={!loading}
                     />
-                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                    <TouchableOpacity 
+                      onPress={() => setShowPassword(!showPassword)}
+                      disabled={loading}
+                    >
                       <Text className="text-xl">{showPassword ? "👁️" : "👁️‍🗨️"}</Text>
                     </TouchableOpacity>
                   </View>
@@ -250,6 +276,7 @@ const AuthScreen = () => {
                         placeholderTextColor="#9CA3AF"
                         secureTextEntry={!showPassword}
                         className="flex-1 text-gray-900 dark:text-light-100"
+                        editable={!loading}
                       />
                     </View>
                   </View>
@@ -276,8 +303,7 @@ const AuthScreen = () => {
               {/* Additional Info */}
               {!isLogin && (
                 <Text className="text-xs text-gray-500 dark:text-light-200 text-center mt-4">
-                  By creating an account, you agree to our Terms of Service and
-                  Privacy Policy
+                  By creating an account, you agree to our Terms of Service and Privacy Policy
                 </Text>
               )}
 
@@ -286,10 +312,11 @@ const AuthScreen = () => {
                   onPress={() =>
                     Alert.alert(
                       "Forgot Password",
-                      "Password reset functionality will be available soon. Please contact support if you need help."
+                      "Please contact support if you need help with your password."
                     )
                   }
                   className="mt-4"
+                  disabled={loading}
                 >
                   <Text className="text-primary text-center font-semibold">
                     Forgot Password?
@@ -302,9 +329,19 @@ const AuthScreen = () => {
             <TouchableOpacity
               onPress={handleSkip}
               className="bg-light-100 dark:bg-dark-100 rounded-2xl py-4 mb-6"
+              disabled={loading}
             >
               <Text className="text-gray-700 dark:text-light-100 font-semibold text-center">
                 Continue as Guest
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={()=>router.push("/")}
+              className="bg-light-100 dark:bg-dark-100 rounded-2xl py-4 mb-6"
+              disabled={loading}
+            >
+              <Text className="text-gray-700 dark:text-light-100 font-semibold text-center">
+                Go Back
               </Text>
             </TouchableOpacity>
 
@@ -315,11 +352,11 @@ const AuthScreen = () => {
               </Text>
               <View className="gap-3">
                 {[
-                  { icon: "📚", text: "Publish your work online" },
-                  { icon: "☁️", text: "Sync across all devices" },
-                  { icon: "💬", text: "Connect with readers" },
+                  { icon: "💾", text: "Save your profile locally" },
+                  { icon: "⚙️", text: "Persist your settings" },
                   { icon: "📊", text: "Track your writing stats" },
-                  { icon: "🔒", text: "Secure cloud backup" },
+                  { icon: "🖼️", text: "Upload profile pictures" },
+                  { icon: "🎯", text: "Set writing goals" },
                 ].map((feature, index) => (
                   <View key={index} className="flex-row items-center">
                     <Text className="text-2xl mr-3">{feature.icon}</Text>

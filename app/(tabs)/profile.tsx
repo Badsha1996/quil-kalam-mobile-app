@@ -6,6 +6,7 @@ import {
   getStats,
   setSetting,
   updateUserProfile,
+  updateDailyGoal,
 } from "@/utils/database";
 // @ts-ignore
 import * as ImagePicker from "expo-image-picker";
@@ -20,6 +21,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
 
 const Profile = () => {
@@ -34,7 +36,9 @@ const Profile = () => {
     bio: "",
   });
   const [dailyGoal, setDailyGoal] = useState(500);
-  const [showPublished, setShowPublished] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [showGoalEditor, setShowGoalEditor] = useState(false);
+  const [tempGoal, setTempGoal] = useState("");
 
   useEffect(() => {
     loadData();
@@ -42,27 +46,43 @@ const Profile = () => {
   }, []);
 
   const loadData = () => {
-    const currentUser = getCurrentUser();
-    setUser(currentUser);
+    try {
+      const currentUser = getCurrentUser();
+      setUser(currentUser);
 
-    const statsData = getStats();
-    const projectsData = getAllProjects();
-    setStats(statsData);
-    setProjects(projectsData as any[]);
+      const statsData = getStats();
+      const projectsData = getAllProjects();
+      setStats(statsData);
+      setProjects(projectsData as any[]);
 
-    if (currentUser) {
-      setEditForm({
-        displayName: currentUser.displayName || "",
-        email: currentUser.email || "",
-        bio: currentUser.bio || "",
-      });
+      if (currentUser) {
+        setEditForm({
+          displayName: currentUser.displayName || "",
+          email: currentUser.email || "",
+          bio: currentUser.bio || "",
+        });
+      }
+    } catch (error) {
+      console.error("Error loading data:", error);
     }
   };
 
   const loadSettings = () => {
-    const savedGoal = getSetting("daily_goal", "500");
-    // @ts-ignore
-    setDailyGoal(parseInt(savedGoal));
+    try {
+      const savedGoal = getSetting("daily_goal", "500");
+      // @ts-ignore
+      const goalValue = parseInt(savedGoal);
+
+      if (!isNaN(goalValue) && goalValue > 0) {
+        setDailyGoal(goalValue);
+      } else {
+        setDailyGoal(500);
+        updateDailyGoal(500);
+      }
+    } catch (error) {
+      console.error("Error loading settings:", error);
+      setDailyGoal(500);
+    }
   };
 
   const handleUpdateProfile = () => {
@@ -70,12 +90,12 @@ const Profile = () => {
 
     try {
       updateUserProfile(user.id, {
-        displayName: editForm.displayName,
-        email: editForm.email,
-        bio: editForm.bio,
+        displayName: editForm.displayName.trim(),
+        email: editForm.email.trim(),
+        bio: editForm.bio.trim(),
       });
       setIsEditingProfile(false);
-      loadData();
+      loadData(); // Reload to get updated user data
       Alert.alert("Success", "Profile updated successfully!");
     } catch (error) {
       Alert.alert("Error", "Failed to update profile");
@@ -83,31 +103,94 @@ const Profile = () => {
   };
 
   const handlePickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    try {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (status !== "granted") {
-      Alert.alert("Permission needed", "Please grant camera roll permissions");
-      return;
-    }
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission needed",
+          "Please grant camera roll permissions to update your profile picture"
+        );
+        return;
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && user) {
-      updateUserProfile(user.id, {
-        profileImageUri: result.assets[0].uri,
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
       });
-      loadData();
+
+      if (!result.canceled && user && result.assets[0].uri) {
+        setIsUploadingImage(true);
+
+        // Update profile with new image URI
+        updateUserProfile(user.id, {
+          profileImageUri: result.assets[0].uri,
+        });
+
+        // Reload user data to show updated image
+        setTimeout(() => {
+          loadData();
+          setIsUploadingImage(false);
+          Alert.alert("Success", "Profile picture updated!");
+        }, 500);
+      }
+    } catch (error) {
+      setIsUploadingImage(false);
+      Alert.alert("Error", "Failed to update profile picture");
     }
   };
 
   const handleUpdateDailyGoal = (newGoal: number) => {
-    setDailyGoal(newGoal);
-    setSetting("daily_goal", newGoal.toString());
+    if (newGoal < 1) {
+      Alert.alert("Error", "Daily goal must be at least 1 word");
+      return;
+    }
+
+    if (newGoal > 100000) {
+      Alert.alert("Error", "Daily goal cannot exceed 100,000 words");
+      return;
+    }
+
+    try {
+      updateDailyGoal(newGoal);
+      setDailyGoal(newGoal);
+      Alert.alert(
+        "Success",
+        `Daily goal set to ${newGoal.toLocaleString()} words!`
+      );
+    } catch (error) {
+      Alert.alert("Error", "Failed to update daily goal");
+    }
+  };
+
+  const handleEditDailyGoal = () => {
+    setTempGoal(dailyGoal.toString());
+    setShowGoalEditor(true);
+  };
+
+  const handleSaveDailyGoal = () => {
+    if (tempGoal && tempGoal.trim()) {
+      const num = parseInt(tempGoal.trim());
+      if (!isNaN(num) && num > 0 && num <= 100000) {
+        handleUpdateDailyGoal(num);
+        setShowGoalEditor(false);
+      } else {
+        Alert.alert(
+          "Error",
+          "Please enter a valid number between 1 and 100,000"
+        );
+      }
+    } else {
+      Alert.alert("Error", "Please enter a valid number");
+    }
+  };
+
+  const handleCancelDailyGoal = () => {
+    setShowGoalEditor(false);
+    setTempGoal("");
   };
 
   const getProjectTypeCount = (type: string) => {
@@ -142,15 +225,16 @@ const Profile = () => {
         text: "Logout",
         style: "destructive",
         onPress: () => {
-          // Clear user session and navigate to login
-          router.replace("/login");
+          // Clear user state
+          setUser(null);
+          setStats(null);
+          setProjects([]);
+
+          // Navigate to home
+          router.replace("/");
         },
       },
     ]);
-  };
-
-  const handleViewPublished = () => {
-    router.push("/published");
   };
 
   const longestProject = getLongestProject();
@@ -189,25 +273,34 @@ const Profile = () => {
         <View className="px-6 mb-6">
           <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 shadow-lg">
             <View className="items-center mb-4">
-              <TouchableOpacity onPress={handlePickImage}>
-                {user?.profileImage ? (
-                  <Image
-                    source={{ uri: user.profileImage }}
-                    className="w-24 h-24 rounded-full mb-4"
-                  />
-                ) : (
-                  <View className="w-24 h-24 rounded-full bg-primary justify-center items-center mb-4">
-                    <Text className="text-5xl">
-                      {user?.displayName
-                        ? user.displayName[0].toUpperCase()
-                        : "✍️"}
-                    </Text>
+              {user && (
+                <TouchableOpacity
+                  onPress={handlePickImage}
+                  disabled={isUploadingImage}
+                >
+                  {isUploadingImage ? (
+                    <View className="w-24 h-24 rounded-full bg-light-100 dark:bg-dark-100 justify-center items-center mb-4">
+                      <ActivityIndicator size="large" color="#6B46C1" />
+                    </View>
+                  ) : user?.profileImage ? (
+                    <Image
+                      source={{ uri: user.profileImage }}
+                      className="w-24 h-24 rounded-full mb-4"
+                    />
+                  ) : (
+                    <View className="w-24 h-24 rounded-full bg-primary justify-center items-center mb-4">
+                      <Text className="text-3xl text-white font-bold">
+                        {user?.displayName
+                          ? user.displayName[0].toUpperCase()
+                          : "U"}
+                      </Text>
+                    </View>
+                  )}
+                  <View className="absolute bottom-3 right-0 w-8 h-8 bg-secondary rounded-full items-center justify-center border-2 border-white dark:border-dark-200">
+                    <Text className="text-sm">📷</Text>
                   </View>
-                )}
-                <View className="absolute bottom-3 right-0 w-8 h-8 bg-secondary rounded-full items-center justify-center">
-                  <Text className="text-lg">📷</Text>
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
+              )}
 
               {isEditingProfile ? (
                 <View className="w-full gap-3 mt-2">
@@ -236,11 +329,12 @@ const Profile = () => {
                     onChangeText={(text) =>
                       setEditForm({ ...editForm, bio: text })
                     }
-                    placeholder="Bio"
+                    placeholder="Tell us about yourself..."
                     placeholderTextColor="#9CA3AF"
                     multiline
                     numberOfLines={3}
-                    className="bg-light-100 dark:bg-dark-100 px-4 py-3 rounded-xl text-base text-gray-900 dark:text-light-100"
+                    textAlignVertical="top"
+                    className="bg-light-100 dark:bg-dark-100 px-4 py-3 rounded-xl text-base text-gray-900 dark:text-light-100 min-h-[80px]"
                   />
                   <View className="flex-row gap-2">
                     <TouchableOpacity
@@ -262,34 +356,44 @@ const Profile = () => {
                   </View>
                 </View>
               ) : (
-                <View className="items-center">
-                  <TouchableOpacity
-                    onPress={() => setIsEditingProfile(true)}
-                    className="flex-row items-center gap-2"
-                  >
-                    <Text className="text-2xl font-bold text-gray-900 dark:text-light-100">
-                      {user?.displayName || "Guest Writer"}
-                    </Text>
-                    <Text className="text-gray-400 dark:text-light-200">
-                      ✏️
-                    </Text>
-                  </TouchableOpacity>
-                  {user?.email && (
-                    <Text className="text-sm text-gray-600 dark:text-light-200 mt-1">
-                      {user.email}
-                    </Text>
-                  )}
-                  {user?.phoneNumber && (
-                    <Text className="text-xs text-gray-500 dark:text-light-200 mt-1">
-                      📱 {user.phoneNumber}
-                    </Text>
-                  )}
-                  {user?.bio && (
-                    <Text className="text-sm text-gray-600 dark:text-light-200 text-center mt-2 px-4">
-                      {user.bio}
-                    </Text>
-                  )}
-                </View>
+                user && (
+                  <View className="items-center">
+                    <TouchableOpacity
+                      onPress={() => setIsEditingProfile(true)}
+                      className="flex-row items-center gap-2"
+                    >
+                      <Text className="text-2xl font-bold text-gray-900 dark:text-light-100">
+                        {user?.displayName || "Guest Writer"}
+                      </Text>
+                      <Text className="text-gray-400 dark:text-light-200">
+                        ✏️
+                      </Text>
+                    </TouchableOpacity>
+                    {user?.email && (
+                      <Text className="text-sm text-gray-600 dark:text-light-200 mt-1">
+                        {user.email}
+                      </Text>
+                    )}
+                    {user?.phoneNumber && (
+                      <Text className="text-xs text-gray-500 dark:text-light-200 mt-1">
+                        📱 {user.phoneNumber}
+                      </Text>
+                    )}
+                    {user?.bio ? (
+                      <Text className="text-sm text-gray-600 dark:text-light-200 text-center mt-2 px-4">
+                        {user.bio}
+                      </Text>
+                    ) : (
+                      <TouchableOpacity
+                        onPress={() => setIsEditingProfile(true)}
+                      >
+                        <Text className="text-sm text-primary text-center mt-2">
+                          + Add a bio
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )
               )}
             </View>
 
@@ -300,23 +404,10 @@ const Profile = () => {
               </Text>
               <View className="flex-row items-center justify-between">
                 <Text className="text-2xl font-bold text-gray-900 dark:text-light-100">
-                  {dailyGoal} words
+                  {dailyGoal.toLocaleString()} words
                 </Text>
                 <TouchableOpacity
-                  onPress={() =>
-                    Alert.prompt(
-                      "Set Daily Goal",
-                      "Enter your daily word count goal",
-                      (text) => {
-                        const num = parseInt(text);
-                        if (!isNaN(num) && num > 0) {
-                          handleUpdateDailyGoal(num);
-                        }
-                      },
-                      "plain-text",
-                      dailyGoal.toString()
-                    )
-                  }
+                  onPress={handleEditDailyGoal}
                   className="bg-primary px-4 py-2 rounded-full"
                 >
                   <Text className="text-white text-xs font-bold">
@@ -324,6 +415,9 @@ const Profile = () => {
                   </Text>
                 </TouchableOpacity>
               </View>
+              <Text className="text-xs text-gray-500 dark:text-light-200 mt-2">
+                Stay motivated with a daily writing target
+              </Text>
             </View>
           </View>
         </View>
@@ -331,10 +425,7 @@ const Profile = () => {
         {/* Publishing Status */}
         {publishedCount > 0 && (
           <View className="px-6 mb-6">
-            <TouchableOpacity
-              onPress={handleViewPublished}
-              className="bg-gradient-to-r from-primary to-purple-600 rounded-3xl p-6 shadow-lg"
-            >
+            <TouchableOpacity className="bg-gradient-to-r from-primary to-purple-600 rounded-3xl p-6 shadow-lg">
               <View className="flex-row items-center justify-between">
                 <View className="flex-1">
                   <Text className="text-sm text-white/80 mb-1">
@@ -573,20 +664,59 @@ const Profile = () => {
           <View className="px-6 mb-6">
             <View className="bg-primary/10 rounded-3xl p-6 border-2 border-primary/20">
               <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-2">
-                Sign in to sync your work
+                Create a local account
               </Text>
               <Text className="text-sm text-gray-600 dark:text-light-200 mb-4">
-                Create an account to publish your work online and access it from
-                any device.
+                Create a local account to save your profile and settings.
               </Text>
               <TouchableOpacity
                 onPress={() => router.push("/login")}
                 className="bg-primary py-3 rounded-xl"
               >
                 <Text className="text-white font-bold text-center">
-                  Sign In / Create Account
+                  Create Account
                 </Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {showGoalEditor && (
+          <View className="absolute top-0 left-0 max-h-screen inset-0 bg-black/50 justify-center items-center z-50">
+            <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 mx-4 w-80">
+              <Text className="text-xl font-bold text-gray-900 dark:text-light-100 mb-2">
+                Set Daily Writing Goal
+              </Text>
+              <Text className="text-gray-600 dark:text-light-200 mb-4">
+                Enter your daily word count goal:
+              </Text>
+
+              <TextInput
+                value={tempGoal}
+                onChangeText={setTempGoal}
+                placeholder="Enter word count goal"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="numeric"
+                className="bg-light-100 dark:bg-dark-100 px-4 py-3 rounded-xl text-gray-900 dark:text-light-100 mb-4 border border-gray-300 dark:border-dark-100"
+                autoFocus
+              />
+
+              <View className="flex-row gap-3">
+                <TouchableOpacity
+                  onPress={handleCancelDailyGoal}
+                  className="flex-1 bg-light-100 dark:bg-dark-100 px-4 py-3 rounded-xl"
+                >
+                  <Text className="text-gray-600 dark:text-light-200 font-bold text-center">
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleSaveDailyGoal}
+                  className="flex-1 bg-primary px-4 py-3 rounded-xl"
+                >
+                  <Text className="text-white font-bold text-center">Save</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
