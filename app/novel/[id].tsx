@@ -2268,8 +2268,8 @@ const NovelDetails = () => {
                   >
                     <View className="flex-row items-center justify-between">
                       <View className="flex-row items-center flex-1">
-                        <View className="w-12 h-12 rounded-xl justify-center items-center mr-3 bg-blue-100 dark:bg-blue-900">
-                          <Text className="text-2xl">📚</Text>
+                        <View className="w-12 h-12 rounded-xl justify-center items-center mr-3 bg-blue-100 dark:bg-blue-200">
+                          <Text className="text-2xl">📃</Text>
                         </View>
                         <View className="flex-1">
                           <Text
