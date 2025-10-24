@@ -595,7 +595,7 @@ const Profile = () => {
         </View>
 
         {/* Actions */}
-        <View className="px-6 mb-6">
+        <View className="px-6 mb-11">
           <Text className="text-xl font-bold text-gray-900 dark:text-light-100 mb-3">
             Actions
           </Text>
@@ -640,7 +640,7 @@ const Profile = () => {
               onPress={() =>
                 Alert.alert(
                   "About QuillKalam",
-                  "QuillKalam - Your Complete Writing Companion\n\nVersion 2.0\n\nCreate, organize, and publish your literary works with ease.",
+                  "QuillKalam - Your Complete Writing Companion\n\nVersion 3.0\n\nCreate, organize, and publish your literary works with ease.",
                   [{ text: "OK" }]
                 )
               }
@@ -661,7 +661,7 @@ const Profile = () => {
 
         {/* Sign In Prompt for Guest Users */}
         {!user && (
-          <View className="px-6 mb-6">
+          <View className="px-6 mb-11">
             <View className="bg-primary/10 rounded-3xl p-6 border-2 border-primary/20">
               <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-2">
                 Create a local account

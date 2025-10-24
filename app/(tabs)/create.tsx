@@ -56,7 +56,7 @@ const create = () => {
 
   // ********************************** Function Definations **********************************
 
-  const handleCreateProject = () => {
+  const handleCreateProject = async () => {
     if (!projectType) {
       Alert.alert("Select Type", "Please choose a project type");
       return;
@@ -66,8 +66,11 @@ const create = () => {
       return;
     }
 
+    //@ts-ignore
+    let projectId;
+
     try {
-      const projectId = createProject({
+      projectId = createProject({
         type: projectType,
         title: title.trim(),
         description: description.trim(),
@@ -79,38 +82,58 @@ const create = () => {
           : undefined,
       });
 
-      Alert.alert("Success", "Project created successfully!", [
-        {
-          text: "View Project",
-          onPress: () => {
-            // map project types to available routes in the app
-            type AllowedRoute = "/novel/[id]" | "/poetry/[id]";
-            const routeMap: Record<
-              "novel" | "poetry" | "shortStory" | "manuscript",
-              AllowedRoute
-            > = {
-              novel: "/novel/[id]",
-              poetry: "/poetry/[id]",
-              shortStory: "/novel/[id]",
-              manuscript: "/novel/[id]",
-            };
-            const pathname =
-              routeMap[
-                projectType as "novel" | "poetry" | "shortStory" | "manuscript"
-              ] ?? "/novel/[id]";
-            router.push({ pathname, params: { id: String(projectId) } });
-          },
-        },
-        {
-          text: "Create Another",
-          onPress: resetForm,
-        },
-      ]);
+      // Project created successfully - now handle navigation
+      if (projectId) {
+        // Define route mapping
+        type AllowedRoute = "/novel/[id]" | "/poetry/[id]";
+        const routeMap: Record<
+          "novel" | "poetry" | "shortStory" | "manuscript",
+          AllowedRoute
+        > = {
+          novel: "/novel/[id]",
+          poetry: "/poetry/[id]",
+          shortStory: "/novel/[id]",
+          manuscript: "/novel/[id]",
+        };
 
-      resetForm();
+        const pathname =
+          routeMap[
+            projectType as "novel" | "poetry" | "shortStory" | "manuscript"
+          ] ?? "/novel/[id]";
+
+        // Show success alert AFTER confirming project creation
+        Alert.alert(
+          "Success",
+          "Project created successfully!",
+          [
+            {
+              text: "Create Another",
+              onPress: () => {
+                resetForm();
+              },
+              style: "cancel",
+            },
+            {
+              text: "View Project",
+              onPress: () => {
+                try {
+                  //@ts-ignore
+                  router.push({ pathname, params: { id: String(projectId) } });
+                } catch (navError) {
+                  console.error("Navigation error:", navError);
+                }
+              },
+            },
+          ],
+          { cancelable: false }
+        );
+      }
     } catch (error) {
       console.error("Error creating project:", error);
-      Alert.alert("Error", "Failed to create project. Please try again.");
+
+      Alert.alert("Error", "Failed to create project. Please try again.", [
+        { text: "OK" },
+      ]);
     }
   };
 
