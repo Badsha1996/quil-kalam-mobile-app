@@ -1,4 +1,5 @@
 import { initDB } from "@/utils/database";
+// @ts-ignore
 import { Stack } from "expo-router";
 import React, { useEffect } from "react";
 import "react-native-gesture-handler";

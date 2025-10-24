@@ -1364,20 +1364,25 @@ export const getProjectStats = (projectId: number) => {
       "SELECT * FROM projects WHERE id = ?",
       projectId
     ) as any;
+    
+    // Query the items table instead of separate tables
     const folderCount = db.getFirstSync(
-      "SELECT COUNT(*) as count FROM folders WHERE project_id = ?",
+      "SELECT COUNT(*) as count FROM items WHERE project_id = ? AND item_type IN ('folder', 'chapter')",
       projectId
     ) as { count: number } | null;
+    
     const fileCount = db.getFirstSync(
-      "SELECT COUNT(*) as count FROM files WHERE project_id = ?",
+      "SELECT COUNT(*) as count FROM items WHERE project_id = ? AND item_type IN ('document', 'note', 'research')",
       projectId
     ) as { count: number } | null;
+    
     const characterCount = db.getFirstSync(
-      "SELECT COUNT(*) as count FROM characters WHERE project_id = ?",
+      "SELECT COUNT(*) as count FROM items WHERE project_id = ? AND item_type = 'character'",
       projectId
     ) as { count: number } | null;
+    
     const locationCount = db.getFirstSync(
-      "SELECT COUNT(*) as count FROM locations WHERE project_id = ?",
+      "SELECT COUNT(*) as count FROM items WHERE project_id = ? AND item_type = 'location'",
       projectId
     ) as { count: number } | null;
 
@@ -1391,7 +1396,7 @@ export const getProjectStats = (projectId: number) => {
             ((project?.word_count || 0) / project.target_word_count) *
             100
           ).toFixed(1)
-        : 0,
+        : "0",
       status: project?.status || "draft",
       folderCount: folderCount?.count || 0,
       fileCount: fileCount?.count || 0,
@@ -1400,7 +1405,18 @@ export const getProjectStats = (projectId: number) => {
     };
   } catch (error) {
     console.error("Error getting project stats:", error);
-    return null;
+    return {
+      title: "",
+      type: "",
+      wordCount: 0,
+      targetWordCount: 0,
+      progress: "0",
+      status: "draft",
+      folderCount: 0,
+      fileCount: 0,
+      characterCount: 0,
+      locationCount: 0,
+    };
   }
 };
 
@@ -2014,6 +2030,8 @@ const updateProjectWordCount = (projectId: number) => {
       now,
       projectId
     );
+    
+    console.log(`Updated project ${projectId} word count to: ${wordCount}`);
   } catch (error) {
     console.error("Error updating project word count:", error);
   }

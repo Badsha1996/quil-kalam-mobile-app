@@ -1,5 +1,6 @@
 import Background from "@/components/common/Background";
 import { PublishedProject } from "@/types/published";
+// @ts-ignore
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {

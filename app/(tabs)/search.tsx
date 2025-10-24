@@ -7,6 +7,7 @@ import {
   getProjectsByType,
   searchProjects,
 } from "@/utils/database";
+// @ts-ignore
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {

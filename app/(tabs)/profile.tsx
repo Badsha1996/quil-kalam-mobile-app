@@ -7,7 +7,9 @@ import {
   setSetting,
   updateUserProfile,
 } from "@/utils/database";
+// @ts-ignore
 import * as ImagePicker from "expo-image-picker";
+// @ts-ignore
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {

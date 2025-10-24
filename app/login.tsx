@@ -1,5 +1,6 @@
 import Background from "@/components/common/Background";
 import { registerLocalUser, loginLocalUser } from "@/utils/database";
+// @ts-ignore
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {

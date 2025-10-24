@@ -1,5 +1,8 @@
+// @ts-ignore
 import { MaterialIcons } from "@expo/vector-icons";
+// @ts-ignore
 import { LinearGradient } from "expo-linear-gradient";
+// @ts-ignore
 import { Tabs } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import { Animated, useColorScheme, View } from "react-native";
@@ -132,6 +135,7 @@ const Layout = () => {
         options={{
           title: "Home",
           headerShown: false,
+          // @ts-ignore
           tabBarIcon: ({ focused }) => (
             <TabsIcon iconName="home" focused={focused} title="Home" />
           ),
@@ -142,6 +146,7 @@ const Layout = () => {
         options={{
           title: "published",
           headerShown: false,
+          // @ts-ignore
           tabBarIcon: ({ focused }) => (
             <TabsIcon iconName="public" focused={focused} title="Discover" />
           ),
@@ -152,6 +157,7 @@ const Layout = () => {
         options={{
           title: "Search",
           headerShown: false,
+          // @ts-ignore
           tabBarIcon: ({ focused }) => (
             <TabsIcon iconName="search" focused={focused} title="Search" />
           ),
@@ -162,6 +168,7 @@ const Layout = () => {
         options={{
           title: "Create",
           headerShown: false,
+          // @ts-ignore
           tabBarIcon: ({ focused }) => (
             <TabsIcon iconName="add-circle" focused={focused} title="Create" />
           ),
@@ -172,6 +179,7 @@ const Layout = () => {
         options={{
           title: "Profile",
           headerShown: false,
+          // @ts-ignore
           tabBarIcon: ({ focused }) => (
             <TabsIcon iconName="person" focused={focused} title="Profile" />
           ),
