@@ -56,6 +56,9 @@ const migrateDatabase = () => {
 
   try {
     // Migration from version 0 to 1 (add user support)
+    // In the migrateDatabase() function, update the version 1 migration:
+
+    // Migration from version 0 to 1 (add user support)
     if (currentVersion < 1) {
       console.log("Migrating to version 1: Adding user support...");
 
@@ -66,20 +69,20 @@ const migrateDatabase = () => {
 
       if (!usersTableExists) {
         db.execSync(`
-          CREATE TABLE users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            phone_number TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            display_name TEXT,
-            email TEXT,
-            profile_image_uri TEXT,
-            bio TEXT,
-            synced_user_id TEXT,
-            last_sync INTEGER,
-            created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL
-          );
-        `);
+      CREATE TABLE users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phone_number TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        display_name TEXT,
+        email TEXT,
+        profile_image_uri TEXT,
+        bio TEXT,
+        synced_user_id TEXT,
+        last_sync INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+    `);
       } else {
         // Add missing columns to existing users table
         const columnsToAdd = [
@@ -93,9 +96,18 @@ const migrateDatabase = () => {
 
         for (const col of columnsToAdd) {
           try {
-            db.execSync(
-              `ALTER TABLE users ADD COLUMN ${col.name} ${col.type};`
-            );
+            // For updated_at column, provide a default value
+            if (col.name === "updated_at") {
+              db.execSync(
+                `ALTER TABLE users ADD COLUMN ${col.name} ${
+                  col.type
+                } DEFAULT ${Date.now()};`
+              );
+            } else {
+              db.execSync(
+                `ALTER TABLE users ADD COLUMN ${col.name} ${col.type};`
+              );
+            }
             console.log(`Added ${col.name} column to users table`);
           } catch (error: any) {
             if (!error.message?.includes("duplicate column")) {
@@ -104,19 +116,21 @@ const migrateDatabase = () => {
           }
         }
 
-        // If updated_at is null, set it to created_at or current time
+        // Update any existing records that might have NULL values
         try {
+          // First, ensure created_at has values for all records
           db.execSync(`
-            UPDATE users SET updated_at = created_at 
-            WHERE updated_at IS NULL AND created_at IS NOT NULL
-          `);
+        UPDATE users SET created_at = ${Date.now()} 
+        WHERE created_at IS NULL
+      `);
 
+          // Then set updated_at to created_at for all records
           db.execSync(`
-            UPDATE users SET updated_at = ${Date.now()} 
-            WHERE updated_at IS NULL
-          `);
+        UPDATE users SET updated_at = created_at 
+        WHERE updated_at IS NULL
+      `);
         } catch (error) {
-          console.warn("Error setting default updated_at values:", error);
+          console.warn("Error setting default timestamp values:", error);
         }
       }
 
@@ -381,7 +395,23 @@ export const initDB = () => {
       );
     `);
 
-    // Create basic tables if they don't exist
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        phone_number TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        display_name TEXT,
+        email TEXT,
+        profile_image_uri TEXT,
+        bio TEXT,
+        synced_user_id TEXT,
+        last_sync INTEGER,
+        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+      );
+    `);
+
+    // Create projects table
     db.execSync(`
       CREATE TABLE IF NOT EXISTS projects (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -399,7 +429,126 @@ export const initDB = () => {
       );
     `);
 
-    // Create other essential tables
+    // CRITICAL: Create content_pages table
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS content_pages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL UNIQUE,
+        title TEXT DEFAULT 'Table of Contents',
+        is_auto_generated BOOLEAN DEFAULT 1,
+        custom_content TEXT,
+        show_page_numbers BOOLEAN DEFAULT 1,
+        show_word_counts BOOLEAN DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+    `);
+
+    // CRITICAL: Create template_stages table
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS template_stages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        template_type TEXT NOT NULL,
+        stage_name TEXT NOT NULL,
+        stage_description TEXT,
+        order_index INTEGER DEFAULT 0,
+        is_completed BOOLEAN DEFAULT 0,
+        notes TEXT,
+        folder_id INTEGER,
+        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Create project_covers table
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS project_covers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        cover_type TEXT NOT NULL,
+        image_uri TEXT NOT NULL,
+        image_width INTEGER,
+        image_height INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        UNIQUE(project_id, cover_type)
+      );
+    `);
+
+    // Create legacy tables (for backward compatibility)
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS folders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        parent_folder_id INTEGER,
+        name TEXT NOT NULL,
+        description TEXT,
+        folder_type TEXT DEFAULT 'chapter',
+        order_index INTEGER DEFAULT 0,
+        color TEXT,
+        icon TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (parent_folder_id) REFERENCES folders(id) ON DELETE CASCADE
+      );
+    `);
+
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        folder_id INTEGER,
+        file_type TEXT NOT NULL,
+        name TEXT NOT NULL,
+        content TEXT,
+        image_uri TEXT,
+        word_count INTEGER DEFAULT 0,
+        order_index INTEGER DEFAULT 0,
+        is_included_in_export BOOLEAN DEFAULT 1,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
+      );
+    `);
+
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS characters (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        role TEXT,
+        description TEXT,
+        image_uri TEXT,
+        backstory TEXT,
+        goals TEXT,
+        traits TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+    `);
+
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS locations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        image_uri TEXT,
+        notes TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Create publishing_settings table
     db.execSync(`
       CREATE TABLE IF NOT EXISTS publishing_settings (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -414,6 +563,7 @@ export const initDB = () => {
         acknowledgments TEXT,
         categories TEXT,
         tags TEXT,
+        export_format TEXT DEFAULT 'pdf',
         is_public BOOLEAN DEFAULT 1,
         allow_comments BOOLEAN DEFAULT 1,
         allow_downloads BOOLEAN DEFAULT 0,
@@ -427,9 +577,17 @@ export const initDB = () => {
       CREATE TABLE IF NOT EXISTS formatting_styles (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         project_id INTEGER,
+        folder_id INTEGER,
+        file_id INTEGER,
         item_id INTEGER,
         scope TEXT NOT NULL,
-        styles TEXT NOT NULL,
+        font_family TEXT DEFAULT 'serif',
+        font_size INTEGER DEFAULT 16,
+        line_height REAL DEFAULT 1.5,
+        text_align TEXT DEFAULT 'left',
+        text_color TEXT DEFAULT '#000000',
+        background_color TEXT DEFAULT '#FFFFFF',
+        styles TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -551,11 +709,12 @@ export const registerLocalUser = async (
     const now = Date.now();
 
     const result = db.runSync(
-      "INSERT INTO users (phone_number, password_hash, display_name, created_at) VALUES (?, ?, ?, ?)",
+      "INSERT INTO users (phone_number, password_hash, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
       phoneNumber,
       passwordHash,
       displayName || null,
-      now
+      now,
+      now // Make sure updated_at is also set
     );
 
     return {
@@ -592,10 +751,6 @@ export const updateUserProfile = (
   }
 ) => {
   try {
-    // First, check if the users table has the updated_at column
-    const tableInfo = db.getAllSync("PRAGMA table_info(users)") as any[];
-    const hasUpdatedAt = tableInfo.some(col => col.name === 'updated_at');
-    
     const updates: string[] = [];
     const values: any[] = [];
 
@@ -621,19 +776,16 @@ export const updateUserProfile = (
       return;
     }
 
-    // Only add updated_at if the column exists
-    if (hasUpdatedAt) {
-      updates.push("updated_at = ?");
-      values.push(Date.now());
-    }
-
+    // Always include updated_at
+    updates.push("updated_at = ?");
+    values.push(Date.now());
     values.push(userId);
 
     const query = `UPDATE users SET ${updates.join(", ")} WHERE id = ?`;
     console.log("Executing query:", query, "with values:", values);
-    
+
     db.runSync(query, ...values);
-    
+
     console.log("Profile updated successfully for user:", userId);
   } catch (error) {
     console.error("Error updating profile:", error);
@@ -707,53 +859,7 @@ export const getSetting = (key: string, defaultValue?: string) => {
 
 // ==================== PROJECT OPERATIONS ====================
 
-export const createProject = (data: {
-  type: "novel" | "poetry" | "shortStory" | "manuscript";
-  title: string;
-  description?: string;
-  genre?: string;
-  authorName?: string;
-  writingTemplate?: string;
-  targetWordCount?: number;
-}) => {
-  try {
-    const now = Date.now();
-    const result = db.runSync(
-      `INSERT INTO projects (type, title, description, genre, author_name, writing_template, target_word_count, created_at, updated_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      data.type,
-      data.title,
-      data.description || "",
-      data.genre || "",
-      data.authorName || "",
-      data.writingTemplate || "freeform",
-      data.targetWordCount || null,
-      now,
-      now
-    );
-
-    const projectId = result.lastInsertRowId;
-
-    // Auto-create content page
-    db.runSync(
-      "INSERT OR IGNORE INTO content_pages (project_id, created_at, updated_at) VALUES (?, ?, ?)",
-      projectId,
-      now,
-      now
-    );
-
-    // If using Hero's Journey template, create template stages
-    if (data.writingTemplate === "heros_journey") {
-      createHerosJourneyStages(projectId);
-    }
-
-    return projectId;
-  } catch (error) {
-    console.error("Error creating project:", error);
-    throw error;
-  }
-};
-
+// Hero's Journey Template (12 stages)
 const createHerosJourneyStages = (projectId: number) => {
   const stages = [
     {
@@ -797,16 +903,286 @@ const createHerosJourneyStages = (projectId: number) => {
     },
   ];
 
+  const now = Date.now();
   stages.forEach((stage, index) => {
     db.runSync(
-      "INSERT INTO template_stages (project_id, template_type, stage_name, stage_description, order_index) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO template_stages (project_id, template_type, stage_name, stage_description, order_index, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
       projectId,
       "heros_journey",
       stage.name,
       stage.description,
-      index
+      index,
+      now,
+      now
     );
   });
+};
+
+// Three Act Structure Template
+const createThreeActStages = (projectId: number) => {
+  const stages = [
+    {
+      name: "Act I: Setup",
+      description: "Introduce characters, setting, and conflict (25%)",
+    },
+    {
+      name: "Inciting Incident",
+      description: "Event that sets the story in motion",
+    },
+    {
+      name: "Plot Point 1",
+      description: "Major turning point that launches Act II",
+    },
+    {
+      name: "Act II: Confrontation",
+      description: "Rising action and complications (50%)",
+    },
+    { name: "Midpoint", description: "Major revelation or turning point" },
+    {
+      name: "Plot Point 2",
+      description: "Lowest point that leads to final act",
+    },
+    { name: "Act III: Resolution", description: "Climax and resolution (25%)" },
+    { name: "Climax", description: "The final confrontation" },
+    {
+      name: "Resolution",
+      description: "Wrap up loose ends and show new normal",
+    },
+  ];
+
+  const now = Date.now();
+  stages.forEach((stage, index) => {
+    db.runSync(
+      "INSERT INTO template_stages (project_id, template_type, stage_name, stage_description, order_index, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      projectId,
+      "three_act",
+      stage.name,
+      stage.description,
+      index,
+      now,
+      now
+    );
+  });
+};
+
+// Save The Cat Template (15 beats)
+const createSaveTheCatStages = (projectId: number) => {
+  const stages = [
+    {
+      name: "Opening Image",
+      description: "A snapshot of the protagonist's life before change",
+    },
+    {
+      name: "Theme Stated",
+      description: "A statement of the story's main theme",
+    },
+    { name: "Setup", description: "Introduce the world and characters" },
+    { name: "Catalyst", description: "The event that changes everything" },
+    { name: "Debate", description: "The protagonist's hesitation" },
+    { name: "Break into Two", description: "Commitment to the journey" },
+    { name: "B Story", description: "Subplot that reflects the theme" },
+    { name: "Fun and Games", description: "Promise of the premise delivered" },
+    { name: "Midpoint", description: "False victory or false defeat" },
+    { name: "Bad Guys Close In", description: "Things get worse" },
+    { name: "All Is Lost", description: "Lowest point" },
+    { name: "Dark Night of the Soul", description: "Moment of reflection" },
+    { name: "Break into Three", description: "Solution found" },
+    { name: "Finale", description: "Applying the lesson learned" },
+    { name: "Final Image", description: "Opposite of opening image" },
+  ];
+
+  const now = Date.now();
+  stages.forEach((stage, index) => {
+    db.runSync(
+      "INSERT INTO template_stages (project_id, template_type, stage_name, stage_description, order_index, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      projectId,
+      "save_the_cat",
+      stage.name,
+      stage.description,
+      index,
+      now,
+      now
+    );
+  });
+};
+
+// Seven Point Structure Template
+const createSevenPointStages = (projectId: number) => {
+  const stages = [
+    {
+      name: "Hook",
+      description: "Where the story starts - establish the status quo",
+    },
+    {
+      name: "Plot Turn 1",
+      description: "Something changes, launching the story",
+    },
+    {
+      name: "Pinch Point 1",
+      description: "Something goes wrong, pressure applied",
+    },
+    {
+      name: "Midpoint",
+      description: "Character moves from reaction to action",
+    },
+    { name: "Pinch Point 2", description: "Major disaster, things get worse" },
+    { name: "Plot Turn 2", description: "Final piece falls into place" },
+    { name: "Resolution", description: "Wrap up and show the new normal" },
+  ];
+
+  const now = Date.now();
+  stages.forEach((stage, index) => {
+    db.runSync(
+      "INSERT INTO template_stages (project_id, template_type, stage_name, stage_description, order_index, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      projectId,
+      "seven_point",
+      stage.name,
+      stage.description,
+      index,
+      now,
+      now
+    );
+  });
+};
+
+// Snowflake Method Template
+const createSnowflakeStages = (projectId: number) => {
+  const stages = [
+    {
+      name: "Step 1: One-Sentence Summary",
+      description: "Write a one-sentence summary of your novel",
+    },
+    {
+      name: "Step 2: One-Paragraph Summary",
+      description: "Expand to a full paragraph (5 sentences)",
+    },
+    {
+      name: "Step 3: Character Summaries",
+      description: "Write one-page summaries for each major character",
+    },
+    {
+      name: "Step 4: Expand to One Page",
+      description: "Expand each sentence from step 2 into a paragraph",
+    },
+    {
+      name: "Step 5: Character Charts",
+      description: "Write detailed character charts for each character",
+    },
+    {
+      name: "Step 6: Four-Page Synopsis",
+      description: "Expand step 4 into a four-page synopsis",
+    },
+    {
+      name: "Step 7: Character Development",
+      description: "Expand character descriptions to full narratives",
+    },
+    {
+      name: "Step 8: Scene List",
+      description: "Create a spreadsheet of scenes",
+    },
+    {
+      name: "Step 9: Scene Narratives",
+      description: "Write multi-paragraph descriptions of each scene",
+    },
+    {
+      name: "Step 10: First Draft",
+      description: "Write the first draft of your novel",
+    },
+  ];
+
+  const now = Date.now();
+  stages.forEach((stage, index) => {
+    db.runSync(
+      "INSERT INTO template_stages (project_id, template_type, stage_name, stage_description, order_index, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      projectId,
+      "snowflake",
+      stage.name,
+      stage.description,
+      index,
+      now,
+      now
+    );
+  });
+};
+
+// Update the createProject function to call the appropriate template function
+export const createProject = (data: {
+  type: "novel" | "poetry" | "shortStory" | "manuscript";
+  title: string;
+  description?: string;
+  genre?: string;
+  authorName?: string;
+  writingTemplate?: string;
+  targetWordCount?: number;
+}) => {
+  try {
+    const now = Date.now();
+
+    // Insert project
+    const result = db.runSync(
+      `INSERT INTO projects (type, title, description, genre, author_name, writing_template, target_word_count, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      data.type,
+      data.title,
+      data.description || "",
+      data.genre || "",
+      data.authorName || "",
+      data.writingTemplate || "freeform",
+      data.targetWordCount || null,
+      now,
+      now
+    );
+
+    const projectId = result.lastInsertRowId;
+    console.log("Project created with ID:", projectId);
+
+    // Try to create content page (non-critical)
+    try {
+      db.runSync(
+        "INSERT OR IGNORE INTO content_pages (project_id, created_at, updated_at) VALUES (?, ?, ?)",
+        projectId,
+        now,
+        now
+      );
+      console.log("Content page created for project:", projectId);
+    } catch (contentPageError) {
+      console.warn("Could not create content page:", contentPageError);
+    }
+
+    // Create template stages based on writing template
+    if (data.writingTemplate && data.writingTemplate !== "freeform") {
+      try {
+        switch (data.writingTemplate) {
+          case "heros_journey":
+            createHerosJourneyStages(projectId);
+            break;
+          case "three_act":
+            createThreeActStages(projectId);
+            break;
+          case "save_the_cat":
+            createSaveTheCatStages(projectId);
+            break;
+          case "seven_point":
+            createSevenPointStages(projectId);
+            break;
+          case "snowflake":
+            createSnowflakeStages(projectId);
+            break;
+          default:
+            console.log(`Unknown template: ${data.writingTemplate}`);
+        }
+        console.log(`Template stages created for: ${data.writingTemplate}`);
+      } catch (stageError) {
+        console.warn("Could not create template stages:", stageError);
+        // Don't fail the entire operation
+      }
+    }
+
+    return projectId;
+  } catch (error) {
+    console.error("Error creating project:", error);
+    throw error;
+  }
 };
 
 export const getProject = (id: number) => {
