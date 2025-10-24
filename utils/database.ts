@@ -76,40 +76,47 @@ const migrateDatabase = () => {
             bio TEXT,
             synced_user_id TEXT,
             last_sync INTEGER,
-            created_at INTEGER NOT NULL
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
           );
         `);
-      }
+      } else {
+        // Add missing columns to existing users table
+        const columnsToAdd = [
+          { name: "updated_at", type: "INTEGER" },
+          { name: "email", type: "TEXT" },
+          { name: "profile_image_uri", type: "TEXT" },
+          { name: "bio", type: "TEXT" },
+          { name: "synced_user_id", type: "TEXT" },
+          { name: "last_sync", type: "INTEGER" },
+        ];
 
-      // Add user_id column to projects if it doesn't exist
-      try {
-        db.execSync("ALTER TABLE projects ADD COLUMN user_id INTEGER;");
-        console.log("Added user_id column to projects");
-      } catch (error: any) {
-        if (!error.message?.includes("duplicate column")) {
-          throw error;
-        }
-        console.log("user_id column already exists");
-      }
-
-      // Add publishing columns to projects
-      const columnsToAdd = [
-        { name: "is_published", type: "BOOLEAN DEFAULT 0" },
-        { name: "published_at", type: "INTEGER" },
-        { name: "published_project_id", type: "TEXT" },
-        { name: "cover_image_uri", type: "TEXT" },
-      ];
-
-      for (const col of columnsToAdd) {
-        try {
-          db.execSync(
-            `ALTER TABLE projects ADD COLUMN ${col.name} ${col.type};`
-          );
-          console.log(`Added ${col.name} column to projects`);
-        } catch (error: any) {
-          if (!error.message?.includes("duplicate column")) {
-            console.warn(`Warning adding ${col.name}:`, error.message);
+        for (const col of columnsToAdd) {
+          try {
+            db.execSync(
+              `ALTER TABLE users ADD COLUMN ${col.name} ${col.type};`
+            );
+            console.log(`Added ${col.name} column to users table`);
+          } catch (error: any) {
+            if (!error.message?.includes("duplicate column")) {
+              console.warn(`Warning adding ${col.name}:`, error.message);
+            }
           }
+        }
+
+        // If updated_at is null, set it to created_at or current time
+        try {
+          db.execSync(`
+            UPDATE users SET updated_at = created_at 
+            WHERE updated_at IS NULL AND created_at IS NOT NULL
+          `);
+
+          db.execSync(`
+            UPDATE users SET updated_at = ${Date.now()} 
+            WHERE updated_at IS NULL
+          `);
+        } catch (error) {
+          console.warn("Error setting default updated_at values:", error);
         }
       }
 
@@ -453,37 +460,6 @@ export const initDB = () => {
 // ==================== ALL OTHER FUNCTIONS FROM PREVIOUS ARTIFACT ====================
 // (Copy all functions from mobile_compatible_db artifact here)
 
-export const registerLocalUser = async (
-  phoneNumber: string,
-  password: string,
-  displayName?: string
-) => {
-  try {
-    const passwordHash = await hashPassword(password);
-    const now = Date.now();
-
-    const result = db.runSync(
-      "INSERT INTO users (phone_number, password_hash, display_name, created_at) VALUES (?, ?, ?, ?)",
-      phoneNumber,
-      passwordHash,
-      displayName || null,
-      now
-    );
-
-    return {
-      id: result.lastInsertRowId,
-      phoneNumber,
-      displayName: displayName || null,
-    };
-  } catch (error: any) {
-    if (error.message?.includes("UNIQUE constraint")) {
-      throw new Error("Phone number already registered");
-    }
-    console.error("Error registering user:", error);
-    throw error;
-  }
-};
-
 export const loginLocalUser = async (phoneNumber: string, password: string) => {
   try {
     const user = db.getFirstSync(
@@ -536,6 +512,76 @@ export const getCurrentUser = () => {
   }
 };
 
+// Add this function to check if phone number already exists
+const checkPhoneNumberExists = (phoneNumber: string): boolean => {
+  try {
+    const result = db.getFirstSync(
+      "SELECT id FROM users WHERE phone_number = ?",
+      phoneNumber
+    ) as { id: number } | null;
+    return !!result;
+  } catch (error) {
+    console.error("Error checking phone number:", error);
+    return false;
+  }
+};
+
+export const registerLocalUser = async (
+  phoneNumber: string,
+  password: string,
+  displayName?: string
+) => {
+  try {
+    // Validate phone number format
+    if (!validatePhoneNumber(phoneNumber)) {
+      throw new Error("Invalid phone number format");
+    }
+
+    // Check if phone number already exists
+    if (checkPhoneNumberExists(phoneNumber)) {
+      throw new Error("Phone number already registered");
+    }
+
+    // Validate password
+    if (!validatePassword(password)) {
+      throw new Error("Password must be at least 6 characters");
+    }
+
+    const passwordHash = await hashPassword(password);
+    const now = Date.now();
+
+    const result = db.runSync(
+      "INSERT INTO users (phone_number, password_hash, display_name, created_at) VALUES (?, ?, ?, ?)",
+      phoneNumber,
+      passwordHash,
+      displayName || null,
+      now
+    );
+
+    return {
+      id: result.lastInsertRowId,
+      phoneNumber,
+      displayName: displayName || null,
+    };
+  } catch (error: any) {
+    console.error("Error registering user:", error);
+    throw error;
+  }
+};
+
+// Add validation functions
+const validatePhoneNumber = (phone: string): boolean => {
+  // Basic validation - allow various formats
+  const phoneRegex =
+    /^[\+]?[1-9][\d]{0,15}$|^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
+  return phoneRegex.test(phone.replace(/[\s\-\(\)\.]/g, ""));
+};
+
+const validatePassword = (password: string): boolean => {
+  return password.length >= 6;
+};
+
+// Update the profile function to handle image updates properly
 export const updateUserProfile = (
   userId: number,
   data: {
@@ -546,35 +592,86 @@ export const updateUserProfile = (
   }
 ) => {
   try {
+    // First, check if the users table has the updated_at column
+    const tableInfo = db.getAllSync("PRAGMA table_info(users)") as any[];
+    const hasUpdatedAt = tableInfo.some(col => col.name === 'updated_at');
+    
     const updates: string[] = [];
     const values: any[] = [];
 
     if (data.displayName !== undefined) {
       updates.push("display_name = ?");
-      values.push(data.displayName);
+      values.push(data.displayName || null);
     }
     if (data.email !== undefined) {
       updates.push("email = ?");
-      values.push(data.email);
+      values.push(data.email || null);
     }
     if (data.bio !== undefined) {
       updates.push("bio = ?");
-      values.push(data.bio);
+      values.push(data.bio || null);
     }
     if (data.profileImageUri !== undefined) {
       updates.push("profile_image_uri = ?");
-      values.push(data.profileImageUri);
+      values.push(data.profileImageUri || null);
+    }
+
+    if (updates.length === 0) {
+      console.log("No updates to make");
+      return;
+    }
+
+    // Only add updated_at if the column exists
+    if (hasUpdatedAt) {
+      updates.push("updated_at = ?");
+      values.push(Date.now());
     }
 
     values.push(userId);
 
-    db.runSync(
-      `UPDATE users SET ${updates.join(", ")} WHERE id = ?`,
-      ...values
-    );
+    const query = `UPDATE users SET ${updates.join(", ")} WHERE id = ?`;
+    console.log("Executing query:", query, "with values:", values);
+    
+    db.runSync(query, ...values);
+    
+    console.log("Profile updated successfully for user:", userId);
   } catch (error) {
     console.error("Error updating profile:", error);
     throw error;
+  }
+};
+
+// Add function to update daily goal
+export const updateDailyGoal = (goal: number) => {
+  try {
+    setSetting("daily_goal", goal.toString());
+  } catch (error) {
+    console.error("Error updating daily goal:", error);
+    throw error;
+  }
+};
+
+// Add function to get user by ID
+export const getUserById = (userId: number) => {
+  try {
+    const user = db.getFirstSync(
+      "SELECT * FROM users WHERE id = ?",
+      userId
+    ) as any;
+
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      phoneNumber: user.phone_number,
+      displayName: user.display_name,
+      email: user.email,
+      profileImage: user.profile_image_uri,
+      bio: user.bio,
+    };
+  } catch (error) {
+    console.error("Error getting user by ID:", error);
+    return null;
   }
 };
 
@@ -1364,23 +1461,23 @@ export const getProjectStats = (projectId: number) => {
       "SELECT * FROM projects WHERE id = ?",
       projectId
     ) as any;
-    
+
     // Query the items table instead of separate tables
     const folderCount = db.getFirstSync(
       "SELECT COUNT(*) as count FROM items WHERE project_id = ? AND item_type IN ('folder', 'chapter')",
       projectId
     ) as { count: number } | null;
-    
+
     const fileCount = db.getFirstSync(
       "SELECT COUNT(*) as count FROM items WHERE project_id = ? AND item_type IN ('document', 'note', 'research')",
       projectId
     ) as { count: number } | null;
-    
+
     const characterCount = db.getFirstSync(
       "SELECT COUNT(*) as count FROM items WHERE project_id = ? AND item_type = 'character'",
       projectId
     ) as { count: number } | null;
-    
+
     const locationCount = db.getFirstSync(
       "SELECT COUNT(*) as count FROM items WHERE project_id = ? AND item_type = 'location'",
       projectId
@@ -2030,7 +2127,7 @@ const updateProjectWordCount = (projectId: number) => {
       now,
       projectId
     );
-    
+
     console.log(`Updated project ${projectId} word count to: ${wordCount}`);
   } catch (error) {
     console.error("Error updating project word count:", error);
