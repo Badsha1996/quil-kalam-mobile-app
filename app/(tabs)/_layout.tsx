@@ -143,7 +143,7 @@ const Layout = () => {
           title: "published",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <TabsIcon iconName="public" focused={focused} title="Stories" />
+            <TabsIcon iconName="public" focused={focused} title="Discover" />
           ),
         }}
       />

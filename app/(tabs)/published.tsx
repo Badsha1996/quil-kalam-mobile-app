@@ -1,4 +1,5 @@
 import Background from "@/components/common/Background";
+import { PublishedProject } from "@/types/published";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -14,24 +15,7 @@ import {
   View,
 } from "react-native";
 
-// Note: In production, you'd import from your database utility
-// For now, this is a placeholder that shows the structure
 const { width } = Dimensions.get("window");
-
-interface PublishedProject {
-  id: string;
-  title: string;
-  description: string;
-  author_name: string;
-  cover_image_url: string;
-  genre: string;
-  word_count: number;
-  view_count: number;
-  like_count: number;
-  comment_count: number;
-  published_at: string;
-  user_id: string;
-}
 
 const PublishedWorks = () => {
   const router = useRouter();
@@ -60,65 +44,7 @@ const PublishedWorks = () => {
   }, [searchQuery, selectedGenre, sortBy, projects]);
 
   const loadPublishedWorks = async () => {
-    // Placeholder data for demo - replace with actual Neon DB call
-    const demoData: PublishedProject[] = [
-      {
-        id: "1",
-        title: "The Dragon's Quest",
-        description:
-          "An epic fantasy adventure about a young warrior's journey to save the kingdom from an ancient dragon.",
-        author_name: "Jane Smith",
-        cover_image_url: "",
-        genre: "Fantasy",
-        word_count: 85000,
-        view_count: 1250,
-        like_count: 342,
-        comment_count: 89,
-        published_at: new Date().toISOString(),
-        user_id: "user1",
-      },
-      {
-        id: "2",
-        title: "Whispers in the Dark",
-        description:
-          "A psychological thriller that will keep you on the edge of your seat.",
-        author_name: "John Doe",
-        cover_image_url: "",
-        genre: "Thriller",
-        word_count: 62000,
-        view_count: 980,
-        like_count: 256,
-        comment_count: 45,
-        published_at: new Date().toISOString(),
-        user_id: "user2",
-      },
-    ];
-
     try {
-      // TODO: Uncomment when Neon DB is configured
-      /*
-      const neonDb = neon(process.env.EXPO_PUBLIC_NEON_DATABASE_URL || "");
-      const result = await neonDb`
-        SELECT 
-          pp.*,
-          u.display_name as author_name,
-          COUNT(DISTINCT l.id) as like_count,
-          COUNT(DISTINCT c.id) as comment_count
-        FROM published_projects pp
-        LEFT JOIN users u ON pp.user_id = u.id
-        LEFT JOIN likes l ON pp.id = l.project_id
-        LEFT JOIN comments c ON pp.id = c.project_id
-        WHERE pp.is_public = TRUE AND pp.status = 'published'
-        GROUP BY pp.id, u.display_name
-        ORDER BY pp.published_at DESC
-      `;
-      setProjects(result as any);
-      setFilteredProjects(result as any);
-      */
-
-      // Using demo data for now
-      setProjects(demoData);
-      setFilteredProjects(demoData);
     } catch (error) {
       console.error("Error loading published works:", error);
       Alert.alert("Error", "Failed to load published works");
@@ -166,59 +92,12 @@ const PublishedWorks = () => {
 
   const handleProjectClick = async (project: PublishedProject) => {
     setSelectedProject(project);
-
-    // TODO: Implement view count increment with Neon DB
-    /*
-    const neonDb = neon(process.env.EXPO_PUBLIC_NEON_DATABASE_URL || "");
-    try {
-      await neonDb`
-        UPDATE published_projects
-        SET view_count = view_count + 1
-        WHERE id = ${project.id}
-      `;
-    } catch (error) {
-      console.error("Error updating view count:", error);
-    }
-    */
   };
 
   const handleReadBook = async () => {
     if (!selectedProject) return;
 
-    // Demo content - replace with actual DB call
-    const demoContent = [
-      {
-        id: "1",
-        name: "Chapter 1: The Beginning",
-        content:
-          "Once upon a time, in a land far away, there lived a young hero who dreamed of grand adventures. Little did they know that their journey was about to begin in the most unexpected way...\n\nThe morning sun cast long shadows across the village square as our hero prepared for what they thought would be an ordinary day. But fate had other plans.\n\nAs the clock tower chimed noon, a mysterious stranger arrived bearing news that would change everything...",
-        order_index: 0,
-      },
-      {
-        id: "2",
-        name: "Chapter 2: The Quest Begins",
-        content:
-          "The path ahead was treacherous, but our hero was determined. With newfound companions by their side, they set forth into the unknown wilderness.\n\nEach step brought new challenges and discoveries. The ancient forest held secrets that had been hidden for centuries, waiting for the right person to uncover them.\n\nAs night fell on their first day of travel, they made camp under the stars, wondering what tomorrow would bring...",
-        order_index: 1,
-      },
-    ];
-
     try {
-      // TODO: Uncomment when Neon DB is configured
-      /*
-      const neonDb = neon(process.env.EXPO_PUBLIC_NEON_DATABASE_URL || "");
-      const items = await neonDb`
-        SELECT * FROM published_items
-        WHERE project_id = ${selectedProject.id}
-        AND item_type = 'document'
-        ORDER BY order_index ASC
-      `;
-      setBookContent(items as any);
-      */
-
-      setBookContent(demoContent);
-      setShowReader(true);
-      setCurrentPage(0);
     } catch (error) {
       console.error("Error loading book content:", error);
       Alert.alert("Error", "Failed to load book content");
@@ -269,12 +148,6 @@ const PublishedWorks = () => {
                 {filteredProjects.length === 1 ? "work" : "works"}
               </Text>
             </View>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="w-12 h-12 rounded-full bg-white dark:bg-dark-200 justify-center items-center shadow-lg"
-            >
-              <Text className="text-2xl">✕</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Search Bar */}
@@ -713,8 +586,8 @@ const PublishedWorks = () => {
                 {currentPage === 0
                   ? "Cover"
                   : currentPage > bookContent.length
-                    ? "End"
-                    : `${currentPage} / ${bookContent.length}`}
+                  ? "End"
+                  : `${currentPage} / ${bookContent.length}`}
               </Text>
             </View>
           </View>
@@ -724,7 +597,9 @@ const PublishedWorks = () => {
             <View
               className="h-full bg-primary"
               style={{
-                width: `${((currentPage + 1) / (bookContent.length + 2)) * 100}%`,
+                width: `${
+                  ((currentPage + 1) / (bookContent.length + 2)) * 100
+                }%`,
               }}
             />
           </View>

@@ -4,32 +4,32 @@
     "slug": "quilkalam",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/solid-bg.png",
+    "icon": "./assets/images/quilkalam-logo.png",
     "scheme": "quilkalam",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "splash": {
-        "image": "./assets/images/solid-bg.png",
+        "image": "./assets/images/quilkalam-logo.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff"
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/solid-bg.png",
+        "foregroundImage": "./assets/images/quilkalam-logo.png",
         "backgroundColor": "#ffffff"
       },
       "splash": {
-        "image": "./assets/images/solid-bg.png",
+        "image": "./assets/images/quilkalam-logo.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff",
-        "mdpi": "./assets/images/solid-bg.png",
-        "hdpi": "./assets/images/solid-bg.png",
-        "xhdpi": "./assets/images/solid-bg.png",
-        "xxhdpi": "./assets/images/solid-bg.png",
-        "xxxhdpi": "./assets/images/solid-bg.png"
+        "mdpi": "./assets/images/quilkalam-logo.png",
+        "hdpi": "./assets/images/quilkalam-logo.png",
+        "xhdpi": "./assets/images/quilkalam-logo.png",
+        "xxhdpi": "./assets/images/quilkalam-logo.png",
+        "xxxhdpi": "./assets/images/quilkalam-logo.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -41,7 +41,7 @@
     "web": {
       "output": "static",
       "bundler": "metro",
-      "favicon": "./assets/images/solid-bg.png"
+      "favicon": "./assets/images/quilkalam-logo.png"
     },
     "plugins": [
       [
@@ -54,7 +54,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/solid-bg.png",
+          "image": "./assets/images/quilkalam-logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"

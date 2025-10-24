@@ -1,6 +1,6 @@
 import Background from "@/components/common/Background";
 import { templates } from "@/constants/create";
-import { getItemIcon } from "@/constants/novelDetails";
+import { fontFamilies, getItemIcon, themes } from "@/constants/novelDetails";
 import {
   structure,
   structure2,
@@ -17,11 +17,15 @@ import {
   getProjectCovers,
   getProjectStats,
   getPublishingSettings,
+  getWritingSettings,
+  setWritingSetting,
   setProjectCover,
   updateItem,
   updateProject,
 } from "@/utils/database";
+// @ts-ignore
 import * as ImagePicker from "expo-image-picker";
+// @ts-ignore
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -119,6 +123,8 @@ const NovelDetails = () => {
   const autoSaveTimer = useRef<any>(null);
   const scrollViewRef = useRef<any>(null);
 
+  // ==================== Effects ====================
+
   useEffect(() => {
     loadProjectData();
     initializeTemplateStructure();
@@ -150,6 +156,8 @@ const NovelDetails = () => {
       calculateEditorStats(editingItem.content);
     }
   }, [editingItem?.content]);
+
+  // ==================== Function Defination ====================
 
   const calculateEditorStats = (html: string) => {
     const plainText = html.replace(/<[^>]*>/g, "").trim();
@@ -261,7 +269,9 @@ const NovelDetails = () => {
 
       Alert.alert(
         "Success",
-        `Applied ${templates.find((t) => t.value === templateType)?.label} template`
+        `Applied ${
+          templates.find((t) => t.value === templateType)?.label
+        } template`
       );
     } catch (error) {
       Alert.alert("Error", "Failed to apply template");
@@ -408,6 +418,27 @@ const NovelDetails = () => {
     setItems(buildItemTree(allItems));
     setPublishingSettingsState(publishData);
     setCovers(coversData);
+
+    const writingSettingsData: any = getWritingSettings(projectId);
+    console.log(statsData);
+    if (writingSettingsData) {
+      setWritingSettings({
+        fontSize: writingSettingsData.font_size,
+        fontFamily: writingSettingsData.font_family,
+        lineHeight: writingSettingsData.line_height,
+        textColor: writingSettingsData.text_color,
+        backgroundColor: writingSettingsData.background_color,
+        paragraphSpacing: writingSettingsData.paragraph_spacing,
+        textAlign: writingSettingsData.text_align,
+        // @ts-ignore
+        pageWidth: writingSettingsData.page_width,
+        marginTop: writingSettingsData.margin_top,
+        marginBottom: writingSettingsData.margin_bottom,
+      });
+      setTypewriterMode(writingSettingsData.typewriter_mode === 1);
+      setAutoSaveEnabled(writingSettingsData.auto_save === 1);
+      setZenMode(writingSettingsData.zen_mode === 1);
+    }
   };
 
   const buildItemTree = (flatItems: ItemNode[]): ItemNode[] => {
@@ -698,10 +729,73 @@ const NovelDetails = () => {
   };
 
   const updateWritingSetting = (key: keyof WritingSettings, value: any) => {
-    setWritingSettings((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+    setWritingSettings((prev) => {
+      const newSettings = { ...prev, [key]: value };
+
+      // Save to database
+      setWritingSetting({
+        // @ts-ignore
+        projectId,
+        [key]: value,
+
+        typewriterMode,
+        autoSave: autoSaveEnabled,
+        zenMode,
+      });
+
+      return newSettings;
+    });
+  };
+
+  const handleTypewriterToggle = (enabled: boolean) => {
+    setTypewriterMode(enabled);
+    setWritingSetting({
+      // @ts-ignore
+      projectId,
+      typewriterMode: enabled,
+    });
+  };
+
+  const handleAutoSaveToggle = (enabled: boolean) => {
+    setAutoSaveEnabled(enabled);
+    setWritingSetting({
+      // @ts-ignore
+      projectId,
+      autoSave: enabled,
+    });
+  };
+
+  const handleZenModeToggle = (enabled: boolean) => {
+    setZenMode(enabled);
+    setWritingSetting({
+      // @ts-ignore
+      projectId,
+      zenMode: enabled,
+    });
+  };
+
+  const reset = () => {
+    setWritingSettings({
+      fontSize: 18,
+      fontFamily: "Georgia",
+      lineHeight: 1.8,
+      textColor: "#1F2937",
+      backgroundColor: "#FFFFFF",
+      paragraphSpacing: 16,
+      textAlign: "left",
+      // @ts-ignore
+      pageWidth: 650,
+      marginTop: 40,
+      marginBottom: 40,
+    });
+
+    setWritingSetting({
+      // @ts-ignore
+      projectId,
+      zenMode: false,
+      typewriterMode: false,
+      ...writingSettings,
+    });
   };
 
   const exportToFormat = (format: "txt" | "html" | "markdown") => {
@@ -736,10 +830,14 @@ const NovelDetails = () => {
 </html>`;
         break;
       case "markdown":
-        exportContent = `# ${project.title}\n\n${project.author_name ? `*by ${project.author_name}*\n\n` : ""}${allDocs
+        exportContent = `# ${project.title}\n\n${
+          project.author_name ? `*by ${project.author_name}*\n\n` : ""
+        }${allDocs
           .map(
             (doc) =>
-              `## ${doc.name}\n\n${doc.content?.replace(/<[^>]*>/g, "") || ""}\n\n`
+              `## ${doc.name}\n\n${
+                doc.content?.replace(/<[^>]*>/g, "") || ""
+              }\n\n`
           )
           .join("\n")}`;
         break;
@@ -754,26 +852,6 @@ const NovelDetails = () => {
   };
 
   const renderWritingSettingsModal = () => {
-    const fontFamilies = [
-      { name: "System", value: "System" },
-      { name: "Georgia", value: "Georgia" },
-      { name: "Times New Roman", value: "Times New Roman" },
-      { name: "Arial", value: "Arial" },
-      { name: "Helvetica", value: "Helvetica" },
-      { name: "Courier New", value: "Courier New" },
-      { name: "Palatino", value: "Palatino" },
-      { name: "Garamond", value: "Garamond" },
-    ];
-
-    const themes = [
-      { name: "Light", bg: "#FFFFFF", text: "#1F2937" },
-      { name: "Dark", bg: "#1F2937", text: "#F3F4F6" },
-      { name: "Sepia", bg: "#F4ECD8", text: "#5C4B37" },
-      { name: "Night", bg: "#0F172A", text: "#E2E8F0" },
-      { name: "Cream", bg: "#FFF8E7", text: "#4A4A4A" },
-      { name: "Solarized", bg: "#FDF6E3", text: "#657B83" },
-    ];
-
     return (
       <Modal
         visible={showWritingSettings}
@@ -977,7 +1055,7 @@ const NovelDetails = () => {
                 </Text>
 
                 <TouchableOpacity
-                  onPress={() => setTypewriterMode(!typewriterMode)}
+                  onPress={() => handleTypewriterToggle(!typewriterMode)}
                   className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-3 flex-row items-center justify-between"
                 >
                   <View className="flex-row items-center">
@@ -992,7 +1070,9 @@ const NovelDetails = () => {
                     </View>
                   </View>
                   <View
-                    className={`w-12 h-7 rounded-full ${typewriterMode ? "bg-primary" : "bg-gray-300"}`}
+                    className={`w-12 h-7 rounded-full ${
+                      typewriterMode ? "bg-primary" : "bg-gray-300"
+                    }`}
                   >
                     <View
                       className={`w-5 h-5 rounded-full bg-white mt-1 ${
@@ -1003,7 +1083,7 @@ const NovelDetails = () => {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={() => setAutoSaveEnabled(!autoSaveEnabled)}
+                  onPress={() => handleAutoSaveToggle(!autoSaveEnabled)}
                   className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-3 flex-row items-center justify-between"
                 >
                   <View className="flex-row items-center">
@@ -1018,7 +1098,9 @@ const NovelDetails = () => {
                     </View>
                   </View>
                   <View
-                    className={`w-12 h-7 rounded-full ${autoSaveEnabled ? "bg-primary" : "bg-gray-300"}`}
+                    className={`w-12 h-7 rounded-full ${
+                      autoSaveEnabled ? "bg-primary" : "bg-gray-300"
+                    }`}
                   >
                     <View
                       className={`w-5 h-5 rounded-full bg-white mt-1 ${
@@ -1032,21 +1114,7 @@ const NovelDetails = () => {
 
             <View className="flex-row gap-3 mt-4">
               <TouchableOpacity
-                onPress={() => {
-                  setWritingSettings({
-                    fontSize: 18,
-                    fontFamily: "Georgia",
-                    lineHeight: 1.8,
-                    textColor: "#1F2937",
-                    backgroundColor: "#FFFFFF",
-                    paragraphSpacing: 16,
-                    textAlign: "left",
-                    // @ts-ignore
-                    pageWidth: 650,
-                    marginTop: 40,
-                    marginBottom: 40,
-                  });
-                }}
+                onPress={() => reset()}
                 className="flex-1 bg-gray-200 dark:bg-dark-100 py-4 rounded-full"
               >
                 <Text className="text-gray-700 dark:text-light-200 font-bold text-center">
@@ -1528,7 +1596,7 @@ const NovelDetails = () => {
                       Items
                     </Text>
                     <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
-                      {stats?.fileCount || 0}
+                      {stats?.fileCount.toLocaleString() || 0}
                     </Text>
                   </View>
                 </View>
@@ -1559,31 +1627,29 @@ const NovelDetails = () => {
         <View className="px-6 py-3 border-b border-gray-200 dark:border-dark-100">
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View className="flex-row gap-2">
-              {[
-                { key: "binder", label: "Binder", icon: "📚" },
-                { key: "corkboard", label: "Corkboard", icon: "📌" },
-                { key: "outline", label: "Outline", icon: "📋" },
-              ].map((view) => (
-                <TouchableOpacity
-                  key={view.key}
-                  onPress={() => setActiveView(view.key as any)}
-                  className={`px-4 py-2 rounded-full ${
-                    activeView === view.key
-                      ? "bg-primary"
-                      : "bg-light-100 dark:bg-dark-200"
-                  }`}
-                >
-                  <Text
-                    className={`text-sm font-bold ${
+              {[{ key: "outline", label: "Outline", icon: "📋" }].map(
+                (view) => (
+                  <TouchableOpacity
+                    key={view.key}
+                    onPress={() => setActiveView(view.key as any)}
+                    className={`px-4 py-2 rounded-full ${
                       activeView === view.key
-                        ? "text-white"
-                        : "text-gray-600 dark:text-light-200"
+                        ? "bg-primary"
+                        : "bg-light-100 dark:bg-dark-200"
                     }`}
                   >
-                    {view.icon} {view.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      className={`text-sm font-bold ${
+                        activeView === view.key
+                          ? "text-white"
+                          : "text-gray-600 dark:text-light-200"
+                      }`}
+                    >
+                      {view.icon} {view.label}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              )}
             </View>
           </ScrollView>
         </View>
@@ -2071,7 +2137,7 @@ const NovelDetails = () => {
                 <Text className="text-sm text-gray-600 dark:text-light-200">
                   Reading: {editorStats.readingTime}m
                 </Text>
-                <TouchableOpacity onPress={() => setZenMode(!zenMode)}>
+                <TouchableOpacity onPress={() => handleZenModeToggle(!zenMode)}>
                   <Text className="text-sm text-primary font-semibold">
                     Zen Mode
                   </Text>
