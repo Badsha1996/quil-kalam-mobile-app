@@ -16,11 +16,42 @@ const projectTypes = [
 ];
 
 const templates = [
-  { value: "freeform", label: "Freeform", desc: "No structure" },
-  { value: "heros_journey", label: "Hero's Journey", desc: "12-stage arc" },
-  { value: "three_act", label: "Three Act", desc: "Classic structure" },
-  { value: "save_the_cat", label: "Save The Cat", desc: "Beat sheet" },
-  { value: "seven_point", label: "Seven Point", desc: "Plot structure" },
+  {
+    value: "freeform",
+    label: "Freeform",
+    desc: "No structure - start from scratch",
+    icon: "🎨",
+  },
+  {
+    value: "heros_journey",
+    label: "Hero's Journey",
+    desc: "12-stage mythological story structure",
+    icon: "🦸",
+  },
+  {
+    value: "three_act",
+    label: "Three Act Structure",
+    desc: "Classic beginning-middle-end structure",
+    icon: "🎭",
+  },
+  {
+    value: "save_the_cat",
+    label: "Save The Cat",
+    desc: "15-beat screenplay structure",
+    icon: "🐱",
+  },
+  {
+    value: "seven_point",
+    label: "Seven Point Structure",
+    desc: "Dan Wells' plot structure system",
+    icon: "📊",
+  },
+  {
+    value: "snowflake",
+    label: "Snowflake Method",
+    desc: "Start simple and expand",
+    icon: "❄️",
+  },
 ];
 
 const genres = [

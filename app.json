@@ -4,47 +4,56 @@
     "slug": "quilkalam",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/solid-bg.jpg",
+    "icon": "./assets/images/quilkalam-logo.png",
     "scheme": "quilkalam",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "splash": {
-        "image": "./assets/images/transparent-bg.png",
+        "image": "./assets/images/quilkalam-logo.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff"
       }
     },
     "android": {
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/transparent-bg.png",
+        "foregroundImage": "./assets/images/quilkalam-logo.png",
         "backgroundColor": "#ffffff"
       },
       "splash": {
-        "image": "./assets/images/transparent-bg.png",
+        "image": "./assets/images/quilkalam-logo.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff",
-        "mdpi": "./assets/images/transparent-bg.png",
-        "hdpi": "./assets/images/transparent-bg.png",
-        "xhdpi": "./assets/images/transparent-bg.png",
-        "xxhdpi": "./assets/images/transparent-bg.png",
-        "xxxhdpi": "./assets/images/transparent-bg.png"
+        "mdpi": "./assets/images/quilkalam-logo.png",
+        "hdpi": "./assets/images/quilkalam-logo.png",
+        "xhdpi": "./assets/images/quilkalam-logo.png",
+        "xxhdpi": "./assets/images/quilkalam-logo.png",
+        "xxxhdpi": "./assets/images/quilkalam-logo.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.quilkalam.myapp",
+      "permissions": ["android.permission.RECORD_AUDIO"]
     },
     "web": {
       "output": "static",
       "bundler": "metro",
-      "favicon": "./assets/images/transparent-bg.png"
+      "favicon": "./assets/images/quilkalam-logo.png"
     },
     "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow access to select images for your profile and covers"
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/transparent-bg.png",
+          "image": "./assets/images/quilkalam-logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
@@ -52,9 +61,17 @@
       ],
       "expo-sqlite"
     ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cb978d09-49f7-4a75-a970-654bb24dd748"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/cb978d09-49f7-4a75-a970-654bb24dd748"
     }
   }
 }

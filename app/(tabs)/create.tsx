@@ -1,6 +1,7 @@
 import Background from "@/components/common/Background";
 import { genres, projectTypes, templates } from "@/constants/create";
 import { createProject } from "@/utils/database";
+// @ts-ignore
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -340,7 +341,7 @@ const create = () => {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={() => resetForm()}
               className="py-3 active:opacity-60"
             >
               <Text className="text-gray-600 dark:text-light-100 text-base text-center font-semibold">

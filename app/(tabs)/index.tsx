@@ -9,8 +9,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+// @ts-ignore
+import { useRouter } from "expo-router";
 
 export default function Index() {
+   const router = useRouter();
   const heroFade = useRef(new Animated.Value(0)).current;
   const heroSlide = useRef(new Animated.Value(-50)).current;
   const heroScale = useRef(new Animated.Value(0.95)).current;
@@ -62,7 +65,7 @@ export default function Index() {
             </Text>
 
             <Text className="text-lg text-dark-100 dark:text-white italic mb-8 text-center leading-7">
-              "Where every voice has a stroy to tell"
+              "Where every voice has a story to tell"
             </Text>
 
             <TouchableOpacity
@@ -75,7 +78,7 @@ export default function Index() {
                 elevation: 8,
               }}
             >
-              <Text className="text-gray-900 dark:text-gray-600 font-bold text-base">
+              <Text onPress={() => router.push("/create")} className="text-gray-900 dark:text-gray-600 font-bold text-base">
                 Start Your Journey
               </Text>
             </TouchableOpacity>
@@ -144,14 +147,14 @@ export default function Index() {
         {/* CTA Section */}
         <View className="mx-6 mt-10 mb-10 bg-dark-200 dark:bg-gray-800 rounded-3xl p-8 items-center">
           <Text className="text-2xl font-extrabold text-white mb-3 text-center">
-            Ready to Write?
+            Are you a Reader?
           </Text>
           <Text className="text-sm text-light-200 mb-6 text-center leading-5">
-            Join thousands of authors creating amazing stories every day
+            Join thousands of readers in our community
           </Text>
           <TouchableOpacity className="bg-secondary px-7 py-3.5 rounded-full active:opacity-80">
-            <Text className="text-gray-900 font-bold text-base">
-              Get Started Free
+            <Text onPress={()=>router.push("/published")} className="text-gray-900 font-bold text-base">
+              Start Reading
             </Text>
           </TouchableOpacity>
         </View>

@@ -7,7 +7,10 @@ interface CardProps {
 }
 
 const Card = ({ children, style }: CardProps) => {
-  return <View>{children}</View>;
+  return (
+    //  @ts-ignore
+    <View>{children}</View>
+  );
 };
 
 export default Card;

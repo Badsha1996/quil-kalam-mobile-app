@@ -50,12 +50,15 @@ const ProjectCard = ({
       }}
     >
       <TouchableOpacity
-        onPress={() =>
+        onPress={() => {
+          // dynamically choose the path based on project type
+          const basePath =
+            project.type === "poetry" ? "/poetry/[id]" : "/novel/[id]";
           router.push({
-            pathname: "/novel/[id]",
+            pathname: basePath,
             params: { id: String(project.id) },
-          })
-        }
+          });
+        }}
         onLongPress={() => handleDeleteProject(project.id, project.title)}
         className="bg-white dark:bg-dark-200 rounded-3xl p-5 mb-4 shadow-lg active:opacity-80"
         style={{
@@ -96,7 +99,9 @@ const ProjectCard = ({
                 </View>
               )}
               <View
-                className={`${getStatusColor(project.status)} px-3 py-1 rounded-full`}
+                className={`${getStatusColor(
+                  project.status
+                )} px-3 py-1 rounded-full`}
               >
                 <Text className="text-white dark:text-dark-100 text-xs font-bold">
                   {project.status.replace("_", " ").toUpperCase()}
@@ -127,7 +132,7 @@ const ProjectCard = ({
                 {formatWordCount(project.target_word_count)}
               </Text>
             </View>
-            <View className="h-2 bg-light-100 dark:bg-dark-100 rounded-full overflow-hidden">
+            <View className="h-3 bg-light-100 dark:bg-dark-100 mt-2 rounded-full overflow-hidden">
               <View
                 className="h-full bg-primary rounded-full"
                 style={{ width: `${Math.min(progress, 100)}%` }}
@@ -136,7 +141,7 @@ const ProjectCard = ({
           </View>
         )}
 
-        <View className="flex-row justify-between items-center pt-3 border-t border-gray-100 dark:border-dark-100">
+        <View className="flex-row justify-between items-center pt-3 ">
           <View className="flex-row items-center gap-4">
             <Text className="text-xs text-gray-500 dark:text-light-200">
               📊 {formatWordCount(project.word_count)} words
