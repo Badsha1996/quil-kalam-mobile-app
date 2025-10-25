@@ -287,7 +287,7 @@ const NovelDetails = () => {
           break;
       }
       // @ts-ignore
-      updateProject(projectId, { writing_template: templateType });
+      updateProject(projectId, { writing_template: templateType } as any);
       loadProjectData();
 
       Alert.alert(

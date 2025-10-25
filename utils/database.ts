@@ -616,7 +616,43 @@ export const initDB = () => {
 };
 
 // ==================== ALL OTHER FUNCTIONS FROM PREVIOUS ARTIFACT ====================
-// (Copy all functions from mobile_compatible_db artifact here)
+
+export const setActiveSession = (userId: number | null) => {
+  try {
+    if (userId === null) {
+      setSetting("active_user_id", "");
+      setSetting("last_logout", Date.now().toString());
+    } else {
+      setSetting("active_user_id", userId.toString());
+      setSetting("last_login", Date.now().toString());
+    }
+  } catch (error) {
+    console.error("Error setting active session:", error);
+    throw error;
+  }
+};
+
+export const getActiveSession = (): number | null => {
+  try {
+    const userId = getSetting("active_user_id");
+    if (!userId || userId === "") {
+      return null;
+    }
+    return parseInt(userId);
+  } catch (error) {
+    console.error("Error getting active session:", error);
+    return null;
+  }
+};
+
+export const clearActiveSession = () => {
+  try {
+    setActiveSession(null);
+  } catch (error) {
+    console.error("Error clearing session:", error);
+    throw error;
+  }
+};
 
 export const loginLocalUser = async (phoneNumber: string, password: string) => {
   try {
@@ -634,6 +670,9 @@ export const loginLocalUser = async (phoneNumber: string, password: string) => {
       throw new Error("Invalid credentials");
     }
 
+    // Set active session
+    setActiveSession(user.id);
+
     return {
       id: user.id,
       phoneNumber: user.phone_number,
@@ -650,8 +689,15 @@ export const loginLocalUser = async (phoneNumber: string, password: string) => {
 
 export const getCurrentUser = () => {
   try {
+    const activeUserId = getActiveSession();
+
+    if (!activeUserId) {
+      return null;
+    }
+
     const user = db.getFirstSync(
-      "SELECT * FROM users ORDER BY last_sync DESC LIMIT 1"
+      "SELECT * FROM users WHERE id = ?",
+      activeUserId
     ) as any;
 
     if (!user) return null;
@@ -714,11 +760,16 @@ export const registerLocalUser = async (
       passwordHash,
       displayName || null,
       now,
-      now // Make sure updated_at is also set
+      now
     );
 
+    const userId = result.lastInsertRowId;
+
+    // Set active session for new user
+    setActiveSession(userId);
+
     return {
-      id: result.lastInsertRowId,
+      id: userId,
       phoneNumber,
       displayName: displayName || null,
     };
@@ -1211,6 +1262,7 @@ export const updateProject = (
     genre?: string;
     status?: string;
     targetWordCount?: number;
+    writing_template?: string;
   }
 ) => {
   try {
@@ -1237,6 +1289,12 @@ export const updateProject = (
     if (data.targetWordCount !== undefined) {
       updates.push("target_word_count = ?");
       values.push(data.targetWordCount);
+    }
+
+    // ADD THIS BLOCK
+    if (data.writing_template !== undefined) {
+      updates.push("writing_template = ?");
+      values.push(data.writing_template);
     }
 
     updates.push("updated_at = ?");

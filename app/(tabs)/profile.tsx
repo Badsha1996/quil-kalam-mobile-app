@@ -4,9 +4,9 @@ import {
   getCurrentUser,
   getSetting,
   getStats,
-  setSetting,
   updateUserProfile,
   updateDailyGoal,
+  clearActiveSession,
 } from "@/utils/database";
 // @ts-ignore
 import * as ImagePicker from "expo-image-picker";
@@ -225,13 +225,23 @@ const Profile = () => {
         text: "Logout",
         style: "destructive",
         onPress: () => {
-          // Clear user state
-          setUser(null);
-          setStats(null);
-          setProjects([]);
+          try {
+            // Clear active session from database
+            clearActiveSession();
 
-          // Navigate to home
-          router.replace("/");
+            // Clear user state
+            setUser(null);
+            setStats(null);
+            setProjects([]);
+
+            // Navigate to home
+            router.replace("/");
+
+            Alert.alert("Success", "You have been logged out successfully");
+          } catch (error) {
+            console.error("Logout error:", error);
+            Alert.alert("Error", "Failed to logout properly");
+          }
         },
       },
     ]);
@@ -398,7 +408,7 @@ const Profile = () => {
             </View>
 
             {/* Daily Goal */}
-            <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mt-4">
+            <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 ">
               <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
                 Daily Writing Goal
               </Text>

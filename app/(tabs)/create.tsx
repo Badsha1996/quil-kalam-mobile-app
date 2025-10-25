@@ -115,14 +115,7 @@ const create = () => {
             },
             {
               text: "View Project",
-              onPress: () => {
-                try {
-                  //@ts-ignore
-                  router.push({ pathname, params: { id: String(projectId) } });
-                } catch (navError) {
-                  console.error("Navigation error:", navError);
-                }
-              },
+              onPress: () => router.push("/search"),
             },
           ],
           { cancelable: false }
