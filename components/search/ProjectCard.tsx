@@ -1,4 +1,5 @@
 import { Project } from "@/types/search";
+import { getProjectCovers } from "@/utils/database";
 import {
   formatDate,
   formatWordCount,
@@ -7,7 +8,7 @@ import {
 } from "@/utils/search";
 import { router } from "expo-router";
 import React, { useEffect, useRef } from "react";
-import { Animated, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Image, Text, TouchableOpacity, View } from "react-native";
 
 const ProjectCard = ({
   project,
@@ -20,6 +21,10 @@ const ProjectCard = ({
 }) => {
   const cardFade = useRef(new Animated.Value(0)).current;
   const cardSlide = useRef(new Animated.Value(20)).current;
+
+  const coversData = getProjectCovers(project.id);
+  const frontCover: any = coversData.find((c: any) => c.cover_type === "front");
+  const backCover: any = coversData.find((c: any) => c.cover_type === "back");
 
   useEffect(() => {
     Animated.parallel([
@@ -71,8 +76,23 @@ const ProjectCard = ({
       >
         <View className="flex-row items-start mb-3">
           <View className="w-14 h-14 rounded-xl bg-primary justify-center items-center mr-4">
-            <Text className="text-3xl">{getTypeIcon(project.type)}</Text>
+            {backCover?.image_uri ? (
+              <Image
+                source={{ uri: backCover.image_uri }}
+                className="w-full h-full"
+                resizeMode="cover"
+              />
+            ) : frontCover?.image_uri ? (
+              <Image
+                source={{ uri: frontCover.image_uri }}
+                className="w-full h-full"
+                resizeMode="cover"
+              />
+            ) : (
+              <Text className="text-4xl">{getTypeIcon(project.type)}</Text>
+            )}
           </View>
+
           <View className="flex-1">
             <Text
               className="text-xl font-bold text-gray-900 dark:text-light-100 mb-1"

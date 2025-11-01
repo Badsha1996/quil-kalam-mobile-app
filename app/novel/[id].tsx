@@ -1416,7 +1416,20 @@ const NovelDetails = () => {
         item.item_type === "folder" || item.item_type === "chapter";
 
       return (
-        <View key={uniqueKey}>
+        <Animated.View
+          key={uniqueKey}
+          style={{
+            opacity: fadeAnim,
+            transform: [
+              {
+                translateY: fadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [20, 0],
+                }),
+              },
+            ],
+          }}
+        >
           <TouchableOpacity
             onPress={() => {
               if (isSelectionMode) {
@@ -1512,13 +1525,13 @@ const NovelDetails = () => {
             item.children.length > 0 &&
             !isCollapsed &&
             renderItemTree(item.children, depth + 1, prefix)}
-        </View>
+        </Animated.View>
       );
     });
   };
 
   const renderHeaderButtons = () => (
-    <View className="flex-row gap-2">
+    <View className="flex-row  justify-evenly w-full gap-2">
       <TouchableOpacity
         onPress={() => setShowTemplateModal(true)}
         className="bg-white dark:bg-dark-200 px-4 py-2 rounded-full shadow-lg"
@@ -1529,13 +1542,22 @@ const NovelDetails = () => {
       </TouchableOpacity>
 
       <TouchableOpacity
+        onPress={() => setShowCoverModal(true)}
+        className="bg-white dark:bg-dark-200 px-4 py-2 rounded-full shadow-lg"
+      >
+        <Text className="text-sm font-bold text-gray-900 dark:text-light-100">
+          📖 Covers
+        </Text>
+      </TouchableOpacity>
+
+      {/* <TouchableOpacity
         onPress={() => setShowExportModal(true)}
         className="bg-white dark:bg-dark-200 px-4 py-2 rounded-full shadow-lg"
       >
         <Text className="text-sm font-bold text-gray-900 dark:text-light-100">
           📤 Export
         </Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
 
       <TouchableOpacity
         onPress={() => setShowBookPreview(true)}
@@ -1546,9 +1568,9 @@ const NovelDetails = () => {
 
       <TouchableOpacity
         onPress={toggleHeaderMinimize}
-        className="w-10 h-10 rounded-full bg-white dark:bg-dark-200 justify-center items-center shadow-lg"
+        className="w-9 h-9 rounded-full bg-white dark:bg-dark-200 justify-center items-center shadow-lg"
       >
-        <Text className="text-xl dark:text-light-100">
+        <Text className="text-2xl flex dark:text-light-100">
           {isHeaderMinimized ? "▼" : "▲"}
         </Text>
       </TouchableOpacity>
@@ -2063,114 +2085,134 @@ const NovelDetails = () => {
   return (
     <Background>
       <View className="flex-1">
-        <Animated.View
-          style={{
-            height: headerHeight.interpolate({
-              inputRange: [0, 1],
-              outputRange: [80, 400],
-            }),
-          }}
-        >
-          <View className="px-6 pt-16 pb-4">
+        <Animated.View>
+          <View className="px-6 pt-16">
             <View className="flex-row justify-between items-center mb-4">
-              <TouchableOpacity
-                onPress={() => router.back()}
-                className="w-10 h-10 rounded-full bg-white dark:bg-dark-200 justify-center items-center shadow-lg"
-              >
-                <Text className="text-xl dark:text-light-100">←</Text>
-              </TouchableOpacity>
               {renderHeaderButtons()}
             </View>
 
-            {!isHeaderMinimized && (
-              <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 shadow-lg">
-                <View className="flex-row items-start mb-4">
-                  <View className="w-16 h-16 rounded-xl bg-secondary justify-center items-center mr-4">
-                    <Text className="text-4xl">📖</Text>
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-2">
-                      {project.title}
-                    </Text>
-                    {project.author_name && (
-                      <Text className="text-sm text-gray-600 dark:text-light-200 mb-2">
-                        by {project.author_name}
+            <Animated.View
+              style={{
+                opacity: headerHeight,
+                maxHeight: headerHeight.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 500],
+                }),
+              }}
+            >
+              {!isHeaderMinimized && (
+                <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 mb-4 shadow-lg">
+                  <View className="flex-row items-start mb-4">
+                    <View className="w-16 h-16 rounded-xl justify-center items-center mr-4 overflow-hidden">
+                      {backCover?.image_uri ? (
+                        <Image
+                          source={{ uri: backCover.image_uri }}
+                          className="w-full h-full"
+                          resizeMode="cover"
+                        />
+                      ) : frontCover?.image_uri ? (
+                        <Image
+                          source={{ uri: frontCover.image_uri }}
+                          className="w-full h-full"
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <Text className="text-4xl">📖</Text>
+                      )}
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-2">
+                        {project.title}
                       </Text>
-                    )}
-                    <View className="flex-row gap-2 flex-wrap">
-                      <TouchableOpacity
-                        onPress={handleUpdateStatus}
-                        className="bg-primary px-3 py-1 rounded-full"
-                      >
-                        <Text className="text-white text-xs font-bold">
-                          {project.status.replace("_", " ").toUpperCase()}
+                      {project.author_name && (
+                        <Text className="text-sm text-gray-600 dark:text-light-200 mb-2">
+                          by {project.author_name}
                         </Text>
-                      </TouchableOpacity>
-                      {project.genre && (
-                        <View className="bg-light-100 dark:bg-dark-100 px-3 py-1 rounded-full">
-                          <Text className="text-gray-600 dark:text-light-200 text-xs font-semibold">
-                            {project.genre}
-                          </Text>
-                        </View>
                       )}
-                      {project.writing_template && (
-                        <View className="bg-light-100 dark:bg-dark-100 px-3 py-1 rounded-full">
-                          <Text className="text-gray-600 dark:text-light-200 text-xs font-semibold">
-                            {
-                              templates.find(
-                                (t) => t.value === project.writing_template
-                              )?.label
-                            }
+
+                      <View className="flex-row gap-2 flex-wrap">
+                        <TouchableOpacity
+                          onPress={handleUpdateStatus}
+                          className="bg-primary px-3 py-1 rounded-full"
+                        >
+                          <Text className="text-white text-xs font-bold">
+                            {project.status.replace("_", " ").toUpperCase()}
                           </Text>
-                        </View>
-                      )}
+                        </TouchableOpacity>
+                        {project.genre && (
+                          <View className="bg-light-100 dark:bg-dark-100 px-3 py-1 rounded-full">
+                            <Text className="text-gray-600 dark:text-light-200 text-xs font-semibold">
+                              {project.genre}
+                            </Text>
+                          </View>
+                        )}
+                        {project.writing_template && (
+                          <View className="bg-light-100 dark:bg-dark-100 px-3 py-1 rounded-full">
+                            <Text className="text-gray-600 dark:text-light-200 text-xs font-semibold">
+                              {
+                                templates.find(
+                                  (t) => t.value === project.writing_template
+                                )?.label
+                              }
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
                   </View>
-                </View>
 
-                <View className="flex-row flex-wrap gap-3 mb-4">
-                  <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-3 flex-1 min-w-[45%]">
-                    <Text className="text-xs text-gray-600 dark:text-light-200 mb-1">
-                      Words
-                    </Text>
-                    <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
-                      {stats?.wordCount?.toLocaleString() || 0}
-                    </Text>
-                  </View>
-                  <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-3 flex-1 min-w-[45%]">
-                    <Text className="text-xs text-gray-600 dark:text-light-200 mb-1">
-                      Items
-                    </Text>
-                    <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
-                      {stats?.fileCount.toLocaleString() || 0}
-                    </Text>
-                  </View>
-                </View>
-
-                {project.target_word_count > 0 && (
-                  <View>
-                    <View className="flex-row justify-between mb-2">
-                      <Text className="text-sm font-semibold text-gray-700 dark:text-light-100">
-                        Progress: {progress.toFixed(1)}%
-                      </Text>
-                      <Text className="text-sm text-gray-600 dark:text-light-200">
-                        Target: {project.target_word_count.toLocaleString()}
+                  {project.description && (
+                    <View className="mt-2 mb-3">
+                      <Text className="text-sm text-gray-600 dark:text-light-200 leading-5">
+                        {project.description}
                       </Text>
                     </View>
-                    <View className="h-3 bg-light-100 dark:bg-dark-100 rounded-full overflow-hidden">
-                      <View
-                        className="h-full bg-primary rounded-full"
-                        style={{ width: `${Math.min(progress, 100)}%` }}
-                      />
+                  )}
+
+                  <View className="flex-row flex-wrap gap-3 mb-4">
+                    <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-3 flex-1 min-w-[45%]">
+                      <Text className="text-xs text-gray-600 dark:text-light-200 mb-1">
+                        Words
+                      </Text>
+                      <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
+                        {stats?.wordCount?.toLocaleString() || 0}
+                      </Text>
+                    </View>
+                    <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-3 flex-1 min-w-[45%]">
+                      <Text className="text-xs text-gray-600 dark:text-light-200 mb-1">
+                        Items
+                      </Text>
+                      <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
+                        {stats?.fileCount.toLocaleString() || 0}
+                      </Text>
                     </View>
                   </View>
-                )}
-              </View>
-            )}
+
+                  {project.target_word_count > 0 && (
+                    <View>
+                      <View className="flex-row justify-between mb-2">
+                        <Text className="text-sm font-semibold text-gray-700 dark:text-light-100">
+                          Progress: {progress.toFixed(1)}%
+                        </Text>
+                        <Text className="text-sm text-gray-600 dark:text-light-200">
+                          Target: {project.target_word_count.toLocaleString()}
+                        </Text>
+                      </View>
+                      <View className="h-3 bg-light-100 dark:bg-dark-100 rounded-full overflow-hidden">
+                        <View
+                          className="h-full bg-primary rounded-full"
+                          style={{ width: `${Math.min(progress, 100)}%` }}
+                        />
+                      </View>
+                    </View>
+                  )}
+                </View>
+              )}
+            </Animated.View>
           </View>
         </Animated.View>
 
-        <View className="px-6 py-3 border-b border-gray-200 dark:border-dark-100">
+        <View className="px-6 pb-4 border-b border-gray-200 dark:border-dark-100">
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View className="flex-row gap-2">
               {[
@@ -2259,45 +2301,66 @@ const NovelDetails = () => {
           {activeView === "chapters" &&
             (getChapters().length > 0 ? (
               <View>
-                {getChapters().map((chapter, index) => (
-                  <TouchableOpacity
-                    key={`chapter-${chapter.id}`}
-                    onPress={() => handleFolderClick(chapter)}
-                    onLongPress={() => handleDeleteItem(chapter)}
-                    className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-3 shadow-sm"
-                  >
-                    <View className="flex-row items-center justify-between">
-                      <View className="flex-row items-center flex-1">
-                        <View className="w-12 h-12 rounded-xl justify-center items-center mr-3 bg-blue-100 dark:bg-blue-200">
-                          <Text className="text-2xl">📃</Text>
-                        </View>
-                        <View className="flex-1">
-                          <Text
-                            className="text-base font-bold text-gray-900 dark:text-light-100"
-                            numberOfLines={1}
-                          >
-                            {chapter.name}
-                          </Text>
-                          <View className="flex-row items-center gap-2 mt-1">
-                            <Text className="text-xs text-gray-500 dark:text-light-200">
-                              Chapter {index + 1}
+                {getChapters()
+                  .sort((a, b) => {
+                    const getNumber = (name: string) => {
+                      const match = name.match(/\d+/);
+                      return match ? parseInt(match[0]) : 0;
+                    };
+
+                    const numA = getNumber(a.name);
+                    const numB = getNumber(b.name);
+
+                    // If both have numbers, sort by number
+                    if (numA && numB) {
+                      return numA - numB;
+                    }
+
+                    // Otherwise, sort alphabetically
+                    return a.name.localeCompare(b.name, undefined, {
+                      numeric: true,
+                      sensitivity: "base",
+                    });
+                  })
+                  .map((chapter, index) => (
+                    <TouchableOpacity
+                      key={`chapter-${chapter.id}`}
+                      onPress={() => handleFolderClick(chapter)}
+                      onLongPress={() => handleDeleteItem(chapter)}
+                      className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-3 shadow-sm"
+                    >
+                      <View className="flex-row items-center justify-between">
+                        <View className="flex-row items-center flex-1">
+                          <View className="w-12 h-12 rounded-xl justify-center items-center mr-3 bg-blue-100 dark:bg-blue-200">
+                            <Text className="text-2xl">📃</Text>
+                          </View>
+                          <View className="flex-1">
+                            <Text
+                              className="text-base font-bold text-gray-900 dark:text-light-100"
+                              numberOfLines={1}
+                            >
+                              {chapter.name}
                             </Text>
-                             {/* @ts-ignore */}
-                            {chapter.word_count > 0 && (
+                            <View className="flex-row items-center gap-2 mt-1">
                               <Text className="text-xs text-gray-500 dark:text-light-200">
-                                 {/* @ts-ignore */}
-                                • {chapter.word_count.toLocaleString()} words
+                                Chapter {index + 1}
                               </Text>
-                            )}
+                              {/* @ts-ignore */}
+                              {chapter.word_count > 0 && (
+                                <Text className="text-xs text-gray-500 dark:text-light-200">
+                                  {/* @ts-ignore */}•{" "}
+                                  {chapter.word_count.toLocaleString()} words
+                                </Text>
+                              )}
+                            </View>
                           </View>
                         </View>
+                        <Text className="text-gray-400 dark:text-light-200 text-2xl">
+                          ›
+                        </Text>
                       </View>
-                      <Text className="text-gray-400 dark:text-light-200 text-2xl">
-                        ›
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
+                    </TouchableOpacity>
+                  ))}
               </View>
             ) : (
               <View className="flex-1 justify-center items-center py-20">
@@ -2339,7 +2402,7 @@ const NovelDetails = () => {
                               className="text-xs text-gray-500 dark:text-light-200 mt-1"
                               numberOfLines={2}
                             >
-                               {/* @ts-ignore */}
+                              {/* @ts-ignore */}
                               {char.description}
                             </Text>
                           )}
@@ -2376,13 +2439,13 @@ const NovelDetails = () => {
                           <Text className="text-base font-bold text-gray-900 dark:text-light-100">
                             {loc.name}
                           </Text>
-                           {/* @ts-ignore */}
+                          {/* @ts-ignore */}
                           {loc.description && (
                             <Text
                               className="text-xs text-gray-500 dark:text-light-200 mt-1"
                               numberOfLines={2}
                             >
-                               {/* @ts-ignore */}
+                              {/* @ts-ignore */}
                               {loc.description}
                             </Text>
                           )}
@@ -2631,7 +2694,7 @@ const NovelDetails = () => {
             }}
           >
             {!zenMode && (
-              <View className="px-6 pt-16 pb-4 border-b border-gray-200 dark:border-dark-100 bg-white dark:bg-dark-300">
+              <View className="px-6 pt-4 pb-4 border-b border-gray-200 dark:border-dark-100 bg-white dark:bg-dark-300">
                 <View className="flex-row items-center justify-between mb-4">
                   <TouchableOpacity
                     onPress={() => setEditingItem(null)}
@@ -2709,7 +2772,7 @@ const NovelDetails = () => {
             {zenMode && (
               <TouchableOpacity
                 onPress={() => setZenMode(false)}
-                className="absolute top-12 right-6 z-50 w-10 h-10 rounded-full bg-black/20 justify-center items-center"
+                className="absolute top-4 right-6 z-50 w-10 h-10 rounded-full bg-black/20 justify-center items-center"
               >
                 <Text className="text-white text-lg">✕</Text>
               </TouchableOpacity>
@@ -3014,20 +3077,24 @@ const NovelDetails = () => {
             scrollEventThrottle={16}
           >
             {frontCover && (
-              <View className="items-center justify-center" style={{ width }}>
+              <View
+                className="items-center justify-center bg-gray-900"
+                style={{ width }}
+              >
                 <Image
                   source={{ uri: frontCover.image_uri }}
                   className="rounded-2xl shadow-2xl"
                   style={{ width: width * 0.7, height: width * 1.05 }}
-                  resizeMode="cover"
+                  resizeMode="contain"
                 />
+                <Text className="text-white mt-4 text-sm">Front Cover</Text>
               </View>
             )}
 
             {allDocs.map((doc, index) => (
               <View
                 key={doc.id}
-                className="px-8 py-12 justify-center"
+                className="px-8 py-12 justify-center bg-gray-900"
                 style={{ width }}
               >
                 <View
@@ -3057,20 +3124,24 @@ const NovelDetails = () => {
                     />
                   </ScrollView>
                   <Text className="text-xs text-gray-500 dark:text-light-200 text-center mt-4">
-                    Page {index + 1}
+                    Page {(frontCover ? 1 : 0) + index + 1}
                   </Text>
                 </View>
               </View>
             ))}
 
             {backCover && (
-              <View className="items-center justify-center" style={{ width }}>
+              <View
+                className="items-center justify-center bg-gray-900"
+                style={{ width }}
+              >
                 <Image
                   source={{ uri: backCover.image_uri }}
                   className="rounded-2xl shadow-2xl"
                   style={{ width: width * 0.7, height: width * 1.05 }}
-                  resizeMode="cover"
+                  resizeMode="contain"
                 />
+                <Text className="text-white mt-4 text-sm">Back Cover</Text>
               </View>
             )}
           </ScrollView>

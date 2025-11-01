@@ -4,6 +4,7 @@ import { Project } from "@/types/search";
 import {
   deleteProject,
   getAllProjects,
+  getProjectCovers,
   getProjectsByType,
   searchProjects,
 } from "@/utils/database";
@@ -37,6 +38,7 @@ const search = () => {
 
   const heroFade = useRef(new Animated.Value(0)).current;
   const heroSlide = useRef(new Animated.Value(-50)).current;
+  
 
   useEffect(() => {
     loadProjects();

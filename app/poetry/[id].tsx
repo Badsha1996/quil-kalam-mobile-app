@@ -357,7 +357,7 @@ const PoetryDetails = () => {
     : 0;
 
   const renderHeaderButtons = () => (
-    <View className="flex-row gap-2">
+    <View className="flex-row gap-2 w-full justify-evenly">
       <TouchableOpacity
         onPress={() => setShowInspirationModal(true)}
         className="bg-white dark:bg-dark-200 px-4 py-2 rounded-full shadow-lg"
@@ -405,20 +405,14 @@ const PoetryDetails = () => {
         >
           <View className="px-6 pt-16">
             <View className="flex-row justify-between items-center mb-2">
-              <TouchableOpacity
-                onPress={() => router.back()}
-                className="w-10 h-10 rounded-full bg-white dark:bg-dark-200 justify-center items-center shadow-lg"
-              >
-                <Text className="text-xl dark:text-light-100">←</Text>
-              </TouchableOpacity>
               {renderHeaderButtons()}
             </View>
 
             {!isHeaderMinimized && (
               <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 shadow-lg">
                 <View className="flex-row items-start mb-4">
-                  <View className="w-16 h-16 rounded-2xl bg-secondary justify-center items-center mr-4">
-                    <Text className="text-4xl">✍️</Text>
+                  <View className="w-16 h-16 rounded-2xl bg-primary justify-center items-center mr-4">
+                    <Text className="text-4xl">✍🏻</Text>
                   </View>
                   <View className="flex-1">
                     <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-2">
@@ -624,7 +618,7 @@ const PoetryDetails = () => {
             <View>
               <View className="flex-row items-center justify-between mb-3">
                 <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
-                  ✍️ All Poems ({poems.length})
+                  ✍🏻 All Poems ({poems.length})
                 </Text>
                 <TouchableOpacity
                   onPress={() => setShowThemeModal(true)}
@@ -693,7 +687,7 @@ const PoetryDetails = () => {
                 })
               ) : (
                 <View className="bg-gradient-to-br from-white to-light-100 dark:bg-dark-200 rounded-2xl p-10 items-center">
-                  <Text className="text-6xl mb-3">✍️</Text>
+                  <Text className="text-6xl mb-3">✍🏻</Text>
                   <Text className="text-xl font-bold text-gray-900 dark:text-light-100 mb-2">
                     No poems yet
                   </Text>
@@ -863,10 +857,10 @@ const PoetryDetails = () => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={handleAddPoem}
-                  className="flex-1 bg-gradient-to-r from-secondary to-pink-200 py-4 rounded-full shadow-lg"
+                  className="flex-1 bg-secondary py-4 rounded-full shadow-lg"
                 >
-                  <Text className="text-gray-900 font-bold text-center">
-                    Save Poem ✨
+                  <Text className="text-gray-900 text-lg font-bold text-center">
+                    Save Poem 
                   </Text>
                 </TouchableOpacity>
               </View>
