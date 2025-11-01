@@ -11,12 +11,15 @@ import {
 } from "react-native";
 // @ts-ignore
 import { useRouter } from "expo-router";
+import { Features, Stat } from "@/constants";
 
 export default function Index() {
-   const router = useRouter();
+  const router = useRouter();
   const heroFade = useRef(new Animated.Value(0)).current;
   const heroSlide = useRef(new Animated.Value(-50)).current;
   const heroScale = useRef(new Animated.Value(0.95)).current;
+
+  // ************************************ EFFECTS **********************************
 
   useEffect(() => {
     Animated.parallel([
@@ -46,7 +49,6 @@ export default function Index() {
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero Section */}
         <View className="px-6 pt-16 pb-10">
           <Animated.View
             className="items-center"
@@ -78,74 +80,47 @@ export default function Index() {
                 elevation: 8,
               }}
             >
-              <Text onPress={() => router.push("/create")} className="text-gray-900 dark:text-gray-600 font-bold text-base">
+              <Text
+                onPress={() => router.push("/create")}
+                className="text-gray-900 dark:text-gray-600 font-bold text-base"
+              >
                 Start Your Journey
               </Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
 
-        {/* Stats Section */}
         <View className="px-5 mb-10">
           <View className="flex-row justify-between">
-            <StatCard
-              number="10K+"
-              label="Active Writers"
-              color="#B6E5D8"
-              delay={200}
-            />
-            <StatCard
-              number="50K+"
-              label="Stories Created"
-              color="#FBE5C8"
-              delay={400}
-            />
-            <StatCard
-              number="10K+"
-              label="Happy Readers"
-              color="#8FDDE7"
-              delay={600}
-            />
+            {Stat.map((s, i) => (
+              <StatCard
+                key={i}
+                number={s.number}
+                label={s.label}
+                color={s.color}
+                delay={s.delay}
+              />
+            ))}
           </View>
         </View>
 
-        {/* Features Section */}
         <View className="px-6">
           <Text className="text-3xl font-extrabold text-gray-900 dark:text-white mb-6 text-center">
             Why Writers Love Us
           </Text>
 
-          <FeatureCard
-            icon="✨"
-            title="Intuitive Writing Experience"
-            description="Focus on your creativity with our distraction-free editor designed for storytellers."
-            delay={100}
-          />
-
-          <FeatureCard
-            icon="📚"
-            title="Organize Your Stories"
-            description="Keep track of multiple projects, chapters, and ideas all in one beautiful interface."
-            delay={200}
-          />
-
-          <FeatureCard
-            icon="👥"
-            title="Connect with Readers"
-            description="Share your work and build an audience that loves your unique storytelling style."
-            delay={300}
-          />
-
-          <FeatureCard
-            icon="🎯"
-            title="Smart Writing Tools"
-            description="Get suggestions, track your progress, and improve your craft with intelligent features."
-            delay={400}
-          />
+          {Features.map((f, i) => (
+            <FeatureCard
+              key={i}
+              icon={f.icon}
+              title={f.title}
+              description={f.description}
+              delay={f.delay}
+            />
+          ))}
         </View>
 
-        {/* CTA Section */}
-        <View className="mx-6 mt-10 mb-10 bg-dark-200 dark:bg-gray-800 rounded-3xl p-8 items-center">
+        <View className="mx-6 mt-4 mb-14 bg-dark-200 dark:bg-gray-800 rounded-3xl p-8 items-center">
           <Text className="text-2xl font-extrabold text-white mb-3 text-center">
             Are you a Reader?
           </Text>
@@ -153,7 +128,10 @@ export default function Index() {
             Join thousands of readers in our community
           </Text>
           <TouchableOpacity className="bg-secondary px-7 py-3.5 rounded-full active:opacity-80">
-            <Text onPress={()=>router.push("/published")} className="text-gray-900 font-bold text-base">
+            <Text
+              onPress={() => router.push("/published")}
+              className="text-gray-900 font-bold text-base"
+            >
               Start Reading
             </Text>
           </TouchableOpacity>
