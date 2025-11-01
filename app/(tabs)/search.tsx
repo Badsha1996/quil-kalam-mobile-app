@@ -1,11 +1,10 @@
 import Background from "@/components/common/Background";
 import ProjectCard from "@/components/search/ProjectCard";
+import { SortedOption, writingTypes } from "@/constants/search";
 import { Project } from "@/types/search";
 import {
   deleteProject,
   getAllProjects,
-  getProjectCovers,
-  getProjectsByType,
   searchProjects,
 } from "@/utils/database";
 // @ts-ignore
@@ -38,8 +37,8 @@ const search = () => {
 
   const heroFade = useRef(new Animated.Value(0)).current;
   const heroSlide = useRef(new Animated.Value(-50)).current;
-  
 
+  // ************************************ EFFECTS **********************************
   useEffect(() => {
     loadProjects();
 
@@ -62,6 +61,8 @@ const search = () => {
       loadProjects();
     }, [])
   );
+
+  // ************************************ Functions Definations **********************************
 
   const loadProjects = () => {
     const allProjects = getAllProjects() as Project[];
@@ -178,14 +179,6 @@ const search = () => {
     applyAllFilters(projects);
   };
 
-  const uniqueGenres = Array.from(
-    new Set(projects.map((p) => p.genre).filter(Boolean))
-  );
-
-  const uniqueStatuses = Array.from(
-    new Set(projects.map((p) => p.status).filter(Boolean))
-  );
-
   const clearAllFilters = () => {
     setSearchQuery("");
     setFilterType("all");
@@ -194,6 +187,16 @@ const search = () => {
     setSortBy("updated");
     setFilteredProjects(projects);
   };
+
+  // ************************************ maps and Reducers **********************************
+
+  const uniqueGenres = Array.from(
+    new Set(projects.map((p) => p.genre).filter(Boolean))
+  );
+
+  const uniqueStatuses = Array.from(
+    new Set(projects.map((p) => p.status).filter(Boolean))
+  );
 
   const activeFilterCount = [
     filterType !== "all" ? 1 : 0,
@@ -260,13 +263,7 @@ const search = () => {
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View className="flex-row gap-3 pb-2">
-                {[
-                  { value: "all", label: "All", icon: "📚" },
-                  { value: "novel", label: "Novels", icon: "📖" },
-                  { value: "poetry", label: "Poetry", icon: "✍🏻" },
-                  { value: "shortStory", label: "Stories", icon: "📝" },
-                  { value: "manuscript", label: "Manuscripts", icon: "📄" },
-                ].map((type) => (
+                {writingTypes.map((type) => (
                   <TouchableOpacity
                     key={type.value}
                     onPress={() => applyFilter(type.value as any)}
@@ -305,17 +302,11 @@ const search = () => {
                   )}
                 </View>
 
-                {/* Sort Options */}
                 <Text className="text-sm font-semibold text-gray-700 dark:text-light-200 mb-2">
                   Sort by:
                 </Text>
                 <View className="flex-row flex-wrap gap-2 mb-4">
-                  {[
-                    { value: "updated", label: "Last Updated", icon: "🕒" },
-                    { value: "created", label: "Date Created", icon: "📅" },
-                    { value: "title", label: "Title A-Z", icon: "🔤" },
-                    { value: "wordcount", label: "Word Count", icon: "📊" },
-                  ].map((option) => (
+                  {SortedOption.map((option) => (
                     <TouchableOpacity
                       key={option.value}
                       onPress={() => handleSortChange(option.value as any)}
@@ -339,7 +330,6 @@ const search = () => {
                   ))}
                 </View>
 
-                {/* Status Filter */}
                 {uniqueStatuses.length > 0 && (
                   <>
                     <Text className="text-sm font-semibold text-gray-700 dark:text-light-200 mb-2">
@@ -394,7 +384,6 @@ const search = () => {
                   </>
                 )}
 
-                {/* Genre Filter */}
                 {uniqueGenres.length > 0 && (
                   <>
                     <Text className="text-sm font-semibold text-gray-700 dark:text-light-200 mb-2">
@@ -453,7 +442,6 @@ const search = () => {
           </Animated.View>
         </View>
 
-        {/* Projects List */}
         <View className="px-6">
           {filteredProjects.length > 0 ? (
             filteredProjects.map((project, index) => (
@@ -485,7 +473,7 @@ const search = () => {
                   className="bg-secondary px-8 py-4 rounded-full"
                 >
                   <Text className="text-gray-900 font-bold text-base">
-                    ✨ Create Project
+                    Create Project
                   </Text>
                 </TouchableOpacity>
               )}
