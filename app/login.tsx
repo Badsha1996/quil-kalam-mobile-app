@@ -1,8 +1,9 @@
 import Background from "@/components/common/Background";
+import { countries } from "@/constants/login";
 import { registerLocalUser, loginLocalUser } from "@/utils/database";
 // @ts-ignore
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -12,6 +13,8 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Modal,
+  FlatList,
 } from "react-native";
 
 const AuthScreen = () => {
@@ -23,19 +26,96 @@ const AuthScreen = () => {
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState(countries[0]);
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationId, setVerificationId] = useState("");
 
   const validatePhoneNumber = (phone: string) => {
-    // More flexible phone number validation
-    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$|^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
-    return phoneRegex.test(phone.replace(/[\s\-\(\)\.]/g, ''));
+    // Remove country code and formatting for validation
+    const cleanPhone = phone.replace(/\D/g, "");
+    return cleanPhone.length >= 7; // Minimum phone number length without country code
   };
 
   const validatePassword = (pass: string) => {
     return pass.length >= 6;
   };
 
+  // Mock function to send verification code (replace with actual SMS service)
+  const sendVerificationCode = async (phoneNumber: string) => {
+    const response = await fetch("/api/send-verification", {
+      method: "POST",
+      body: JSON.stringify({ phoneNumber }),
+    });
+    const data = await response.json();
+    setVerificationId(data.verificationId);
+  };
+
+  // Mock function to verify code (replace with actual verification)
+  const verifyCode = async (code: string) => {
+    setLoading(true);
+    try {
+      // Simulate verification process
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // In a real app, you would verify with your SMS service
+      // For demo, accept any 6-digit code or "123456"
+      if (code.length === 6) {
+        return true;
+      }
+      throw new Error("Invalid verification code");
+    } catch (error) {
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAuth = async () => {
-    // Validation
+    if (isVerifying) {
+      // Handle verification code submission
+      if (!verificationCode.trim()) {
+        Alert.alert("Error", "Please enter the verification code");
+        return;
+      }
+
+      setLoading(true);
+      try {
+        await verifyCode(verificationCode);
+
+        // Continue with registration/login after successful verification
+        const fullPhoneNumber =
+          selectedCountry.dial_code + phoneNumber.replace(/\D/g, "");
+
+        if (isLogin) {
+          const user = await loginLocalUser(fullPhoneNumber, password);
+          Alert.alert(
+            "Success",
+            `Welcome back, ${user.displayName || "Writer"}!`
+          );
+          router.replace("/(tabs)");
+        } else {
+          const user = await registerLocalUser(
+            fullPhoneNumber,
+            password,
+            displayName
+          );
+          Alert.alert(
+            "Success",
+            `Account created successfully! Welcome, ${displayName}!`
+          );
+          router.replace("/(tabs)");
+        }
+      } catch (error: any) {
+        Alert.alert("Error", error.message || "Invalid verification code");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Original validation (before verification)
     if (!phoneNumber.trim()) {
       Alert.alert("Error", "Please enter your phone number");
       return;
@@ -68,31 +148,10 @@ const AuthScreen = () => {
       }
     }
 
-    setLoading(true);
-
-    try {
-      if (isLogin) {
-        // Login
-        const user = await loginLocalUser(phoneNumber, password);
-        Alert.alert("Success", `Welcome back, ${user.displayName || 'Writer'}!`);
-        router.replace('/(tabs)');
-      } else {
-        // Register
-        const user = await registerLocalUser(phoneNumber, password, displayName);
-        Alert.alert(
-          "Success",
-          `Account created successfully! Welcome, ${displayName}!`
-        );
-        router.replace('/(tabs)');
-      }
-    } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error.message || (isLogin ? "Login failed" : "Registration failed")
-      );
-    } finally {
-      setLoading(false);
-    }
+    // Send verification code
+    const fullPhoneNumber =
+      selectedCountry.dial_code + phoneNumber.replace(/\D/g, "");
+    await sendVerificationCode(fullPhoneNumber);
   };
 
   const handleSkip = () => {
@@ -103,7 +162,7 @@ const AuthScreen = () => {
         { text: "Cancel", style: "cancel" },
         {
           text: "Continue",
-          onPress: () => router.replace('/(tabs)'),
+          onPress: () => router.replace("/(tabs)"),
         },
       ]
     );
@@ -111,16 +170,17 @@ const AuthScreen = () => {
 
   // Format phone number as user types
   const formatPhoneNumber = (text: string) => {
-    // Remove all non-digit characters
-    const cleaned = text.replace(/\D/g, '');
-    
-    // Format based on length
+    const cleaned = text.replace(/\D/g, "");
+
     if (cleaned.length <= 3) {
       return cleaned;
     } else if (cleaned.length <= 6) {
-      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+      return `${cleaned.slice(0, 3)} ${cleaned.slice(3)}`;
     } else {
-      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+      return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(
+        6,
+        10
+      )}`;
     }
   };
 
@@ -128,6 +188,53 @@ const AuthScreen = () => {
     const formatted = formatPhoneNumber(text);
     setPhoneNumber(formatted);
   };
+
+  const selectCountry = (country: any) => {
+    setSelectedCountry(country);
+    setShowCountryPicker(false);
+  };
+
+  const CountryPicker = () => (
+    <Modal visible={showCountryPicker} animationType="slide" transparent={true}>
+      <View className="flex-1 justify-center bg-black/50">
+        <View className="mx-4 bg-white dark:bg-dark-200 rounded-2xl max-h-80">
+          <View className="p-4 border-b border-gray-200 dark:border-dark-100">
+            <Text className="text-lg font-bold text-gray-900 dark:text-light-100">
+              Select Country
+            </Text>
+          </View>
+          <FlatList
+            data={countries}
+            keyExtractor={(item) => item.code}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() => selectCountry(item)}
+                className="px-4 py-3 flex-row items-center border-b border-gray-100 dark:border-dark-100"
+              >
+                <Text className="text-lg mr-3 text-gray-900 dark:text-light-100">
+                  {item.dial_code}
+                </Text>
+                <Text className="text-gray-900 dark:text-light-100 flex-1">
+                  {item.name}
+                </Text>
+                <Text className="text-gray-500 dark:text-light-200">
+                  {item.code}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
+          <TouchableOpacity
+            onPress={() => setShowCountryPicker(false)}
+            className="p-4 border-t border-gray-200 dark:border-dark-100"
+          >
+            <Text className="text-primary text-center font-semibold">
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   return (
     <Background>
@@ -160,7 +267,10 @@ const AuthScreen = () => {
               {/* Toggle Tabs */}
               <View className="flex-row bg-light-100 dark:bg-dark-100 rounded-2xl p-1 mb-6">
                 <TouchableOpacity
-                  onPress={() => setIsLogin(true)}
+                  onPress={() => {
+                    setIsLogin(true);
+                    setIsVerifying(false);
+                  }}
                   className={`flex-1 py-3 rounded-xl ${
                     isLogin ? "bg-primary" : ""
                   }`}
@@ -176,7 +286,10 @@ const AuthScreen = () => {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => setIsLogin(false)}
+                  onPress={() => {
+                    setIsLogin(false);
+                    setIsVerifying(false);
+                  }}
                   className={`flex-1 py-3 rounded-xl ${
                     !isLogin ? "bg-primary" : ""
                   }`}
@@ -195,7 +308,7 @@ const AuthScreen = () => {
 
               {/* Input Fields */}
               <View className="gap-4">
-                {!isLogin && (
+                {!isLogin && !isVerifying && (
                   <View>
                     <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
                       Display Name
@@ -215,70 +328,142 @@ const AuthScreen = () => {
                   </View>
                 )}
 
-                <View>
-                  <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
-                    Phone Number
-                  </Text>
-                  <View className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
-                    <Text className="text-xl mr-2">📱</Text>
-                    <TextInput
-                      value={phoneNumber}
-                      onChangeText={handlePhoneNumberChange}
-                      placeholder="(555) 123-4567"
-                      placeholderTextColor="#9CA3AF"
-                      keyboardType="phone-pad"
-                      className="flex-1 text-gray-900 dark:text-light-100"
-                      editable={!loading}
-                    />
-                  </View>
-                </View>
+                {!isVerifying ? (
+                  <>
+                    <View>
+                      <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
+                        Phone Number
+                      </Text>
+                      <View className="flex-row gap-2">
+                        <TouchableOpacity
+                          onPress={() => setShowCountryPicker(true)}
+                          className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center min-w-20"
+                          disabled={loading}
+                        >
+                          <Text className="text-gray-900 dark:text-light-100">
+                            {selectedCountry.dial_code}
+                          </Text>
+                          <Text className="text-gray-900 dark:text-light-100 ml-1">
+                            ▼
+                          </Text>
+                        </TouchableOpacity>
+                        <View className="flex-1 bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
+                          
+                          <TextInput
+                            value={phoneNumber}
+                            onChangeText={handlePhoneNumberChange}
+                            placeholder="Your phone number"
+                            placeholderTextColor="#9CA3AF"
+                            keyboardType="phone-pad"
+                            className="flex-1 text-gray-900 dark:text-light-100"
+                            editable={!loading}
+                          />
+                        </View>
+                      </View>
+                    </View>
 
-                <View>
-                  <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
-                    Password
-                  </Text>
-                  <View className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
-                    <Text className="text-xl mr-2">🔒</Text>
-                    <TextInput
-                      value={password}
-                      onChangeText={setPassword}
-                      placeholder="Enter password"
-                      placeholderTextColor="#9CA3AF"
-                      secureTextEntry={!showPassword}
-                      className="flex-1 text-gray-900 dark:text-light-100"
-                      editable={!loading}
-                    />
-                    <TouchableOpacity 
-                      onPress={() => setShowPassword(!showPassword)}
-                      disabled={loading}
-                    >
-                      <Text className="text-xl">{showPassword ? "👁️" : "👁️‍🗨️"}</Text>
-                    </TouchableOpacity>
-                  </View>
-                  {!isLogin && (
-                    <Text className="text-xs text-gray-500 dark:text-light-200 mt-1 ml-1">
-                      Minimum 6 characters
-                    </Text>
-                  )}
-                </View>
+                    {!isLogin && (
+                      <>
+                        <View>
+                          <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
+                            Password
+                          </Text>
+                          <View className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
+                            <Text className="text-xl mr-2">🔒</Text>
+                            <TextInput
+                              value={password}
+                              onChangeText={setPassword}
+                              placeholder="Enter password"
+                              placeholderTextColor="#9CA3AF"
+                              secureTextEntry={!showPassword}
+                              className="flex-1 text-gray-900 dark:text-light-100"
+                              editable={!loading}
+                            />
+                            <TouchableOpacity
+                              onPress={() => setShowPassword(!showPassword)}
+                              disabled={loading}
+                            >
+                              <Text className="text-xl">
+                                {showPassword ? "👁️" : "👁️‍🗨️"}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                          <Text className="text-xs text-gray-500 dark:text-light-200 mt-1 ml-1">
+                            Minimum 6 characters
+                          </Text>
+                        </View>
 
-                {!isLogin && (
+                        <View>
+                          <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
+                            Confirm Password
+                          </Text>
+                          <View className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
+                            <Text className="text-xl mr-2">🔒</Text>
+                            <TextInput
+                              value={confirmPassword}
+                              onChangeText={setConfirmPassword}
+                              placeholder="Confirm password"
+                              placeholderTextColor="#9CA3AF"
+                              secureTextEntry={!showPassword}
+                              className="flex-1 text-gray-900 dark:text-light-100"
+                              editable={!loading}
+                            />
+                          </View>
+                        </View>
+                      </>
+                    )}
+
+                    {isLogin && (
+                      <View>
+                        <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
+                          Password
+                        </Text>
+                        <View className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
+                          <Text className="text-xl mr-2">🔒</Text>
+                          <TextInput
+                            value={password}
+                            onChangeText={setPassword}
+                            placeholder="Enter password"
+                            placeholderTextColor="#9CA3AF"
+                            secureTextEntry={!showPassword}
+                            className="flex-1 text-gray-900 dark:text-light-100"
+                            editable={!loading}
+                          />
+                          <TouchableOpacity
+                            onPress={() => setShowPassword(!showPassword)}
+                            disabled={loading}
+                          >
+                            <Text className="text-xl">
+                              {showPassword ? "👁️" : "👁️‍🗨️"}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  // Verification Code Input
                   <View>
                     <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
-                      Confirm Password
+                      Verification Code
                     </Text>
                     <View className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
-                      <Text className="text-xl mr-2">🔒</Text>
+                      <Text className="text-xl mr-2">🔢</Text>
                       <TextInput
-                        value={confirmPassword}
-                        onChangeText={setConfirmPassword}
-                        placeholder="Confirm password"
+                        value={verificationCode}
+                        onChangeText={setVerificationCode}
+                        placeholder="Enter 6-digit code"
                         placeholderTextColor="#9CA3AF"
-                        secureTextEntry={!showPassword}
+                        keyboardType="number-pad"
                         className="flex-1 text-gray-900 dark:text-light-100"
                         editable={!loading}
+                        maxLength={6}
                       />
                     </View>
+                    <Text className="text-xs text-gray-500 dark:text-light-200 mt-1 ml-1">
+                      Enter the code sent to {selectedCountry.dial_code}
+                      {phoneNumber}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -294,20 +479,36 @@ const AuthScreen = () => {
                 <Text className="text-white font-bold text-center text-lg">
                   {loading
                     ? "Please wait..."
+                    : isVerifying
+                    ? "Verify Code"
                     : isLogin
                     ? "Login"
                     : "Create Account"}
                 </Text>
               </TouchableOpacity>
 
+              {/* Back to phone input during verification */}
+              {isVerifying && (
+                <TouchableOpacity
+                  onPress={() => setIsVerifying(false)}
+                  className="mt-4"
+                  disabled={loading}
+                >
+                  <Text className="text-primary text-center font-semibold">
+                    Change Phone Number
+                  </Text>
+                </TouchableOpacity>
+              )}
+
               {/* Additional Info */}
-              {!isLogin && (
+              {!isLogin && !isVerifying && (
                 <Text className="text-xs text-gray-500 dark:text-light-200 text-center mt-4">
-                  By creating an account, you agree to our Terms of Service and Privacy Policy
+                  By creating an account, you agree to our Terms of Service and
+                  Privacy Policy
                 </Text>
               )}
 
-              {isLogin && (
+              {isLogin && !isVerifying && (
                 <TouchableOpacity
                   onPress={() =>
                     Alert.alert(
@@ -336,7 +537,7 @@ const AuthScreen = () => {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={()=>router.push("/")}
+              onPress={() => router.push("/")}
               className="bg-light-100 dark:bg-dark-100 rounded-2xl py-4 mb-6"
               disabled={loading}
             >
@@ -370,6 +571,8 @@ const AuthScreen = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <CountryPicker />
     </Background>
   );
 };
