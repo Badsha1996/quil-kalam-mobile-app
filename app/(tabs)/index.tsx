@@ -120,17 +120,17 @@ export default function Index() {
           ))}
         </View>
 
-        <View className="mx-6 mt-4 mb-14 bg-dark-200 dark:bg-gray-800 rounded-3xl p-8 items-center">
-          <Text className="text-2xl font-extrabold text-white mb-3 text-center">
+        <View className="mx-6 mt-4 mb-14 bg-dark-200 dark:bg-gray-100 rounded-3xl p-8 items-center">
+          <Text className="text-2xl font-extrabold text-white dark:text-dark-200 mb-3 text-center">
             Are you a Reader?
           </Text>
-          <Text className="text-sm text-light-200 mb-6 text-center leading-5">
+          <Text className="text-sm text-light-200 dark:text-dark-200 mb-6 text-center leading-5">
             Join thousands of readers in our community
           </Text>
-          <TouchableOpacity className="bg-secondary px-7 py-3.5 rounded-full active:opacity-80">
+          <TouchableOpacity className="bg-secondary dark:bg-transparent dark:border dark:border-black px-7 py-3.5 rounded-full active:opacity-80">
             <Text
               onPress={() => router.push("/published")}
-              className="text-gray-900 font-bold text-base"
+              className="text-gray-900 dark:text-black font-bold text-lg"
             >
               Start Reading
             </Text>
