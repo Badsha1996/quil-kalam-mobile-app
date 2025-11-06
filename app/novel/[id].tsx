@@ -9,6 +9,7 @@ import {
   structure5,
 } from "@/constants/template";
 import { ItemNode, WritingSettings } from "@/types/novelDetails";
+import { publishProject } from "@/utils/api";
 import {
   createItem,
   deleteItem,
@@ -1752,6 +1753,36 @@ const NovelDetails = () => {
     if (selectedItems.size === 0) return;
     setShowActionModal(true);
   };
+  const handlePublishProject = async () => {
+    try {
+      if (!project) return;
+
+      // Get front cover image if available
+      const frontCover = covers.find((c) => c.cover_type === "front");
+      const coverImage = frontCover?.image_uri;
+
+      // Prepare project data for publishing
+      const projectData = {
+        localProjectId: projectId,
+        type: project.type || "novel",
+        title: project.title,
+        description: project.description,
+        genre: project.genre,
+        authorName: project.author_name,
+        coverImage: coverImage,
+        wordCount: stats?.wordCount || 0,
+        items: items, // Your project items
+        settings: publishingSettings, // Your publishing settings
+      };
+
+      // Call your existing publishProject function from api.ts
+      const result = await publishProject(projectData);
+
+      Alert.alert("Success", "Project published successfully!");
+    } catch (error: any) {
+      Alert.alert("Publish Failed", error.message);
+    }
+  };
 
   const performMove = (targetFolderId: number | null) => {
     try {
@@ -2103,7 +2134,7 @@ const NovelDetails = () => {
               {!isHeaderMinimized && (
                 <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 mb-4 shadow-lg">
                   <View className="flex-row items-start mb-4">
-                    <View className="w-16 h-16 rounded-xl justify-center items-center mr-4 overflow-hidden">
+                    <View className="w-16 h-16 rounded-xl justify-center bg-primary items-center mr-4 overflow-hidden">
                       {backCover?.image_uri ? (
                         <Image
                           source={{ uri: backCover.image_uri }}
@@ -2206,6 +2237,15 @@ const NovelDetails = () => {
                       </View>
                     </View>
                   )}
+
+                  <TouchableOpacity
+                    onPress={handlePublishProject}
+                    className="bg-green-400 px-4 py-4 mt-4 rounded-full shadow-lg"
+                  >
+                    <Text className="text-sm font-bold text-white">
+                      📤 Publish
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               )}
             </Animated.View>

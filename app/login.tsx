@@ -1,9 +1,9 @@
 import Background from "@/components/common/Background";
 import { countries } from "@/constants/login";
-import { registerLocalUser, loginLocalUser } from "@/utils/database";
-// @ts-ignore
+import { registerLocalUser, loginLocalUser, setActiveSession } from "@/utils/database";
+import { registerUser as registerRemote, loginUser as loginRemote, initAuth } from "@/utils/api";
 import { useRouter } from "expo-router";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -28,94 +28,18 @@ const AuthScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState(countries[0]);
   const [showCountryPicker, setShowCountryPicker] = useState(false);
-  const [verificationCode, setVerificationCode] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationId, setVerificationId] = useState("");
 
   const validatePhoneNumber = (phone: string) => {
-    // Remove country code and formatting for validation
     const cleanPhone = phone.replace(/\D/g, "");
-    return cleanPhone.length >= 7; // Minimum phone number length without country code
+    return cleanPhone.length >= 7;
   };
 
   const validatePassword = (pass: string) => {
     return pass.length >= 6;
   };
 
-  // Mock function to send verification code (replace with actual SMS service)
-  const sendVerificationCode = async (phoneNumber: string) => {
-    const response = await fetch("/api/send-verification", {
-      method: "POST",
-      body: JSON.stringify({ phoneNumber }),
-    });
-    const data = await response.json();
-    setVerificationId(data.verificationId);
-  };
-
-  // Mock function to verify code (replace with actual verification)
-  const verifyCode = async (code: string) => {
-    setLoading(true);
-    try {
-      // Simulate verification process
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // In a real app, you would verify with your SMS service
-      // For demo, accept any 6-digit code or "123456"
-      if (code.length === 6) {
-        return true;
-      }
-      throw new Error("Invalid verification code");
-    } catch (error) {
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleAuth = async () => {
-    if (isVerifying) {
-      // Handle verification code submission
-      if (!verificationCode.trim()) {
-        Alert.alert("Error", "Please enter the verification code");
-        return;
-      }
-
-      setLoading(true);
-      try {
-        await verifyCode(verificationCode);
-
-        // Continue with registration/login after successful verification
-        const fullPhoneNumber =
-          selectedCountry.dial_code + phoneNumber.replace(/\D/g, "");
-
-        if (isLogin) {
-          const user = await loginLocalUser(fullPhoneNumber, password);
-          Alert.alert(
-            "Success",
-            `Welcome back, ${user.displayName || "Writer"}!`
-          );
-          router.replace("/(tabs)");
-        } else {
-          const user = await registerLocalUser(
-            fullPhoneNumber,
-            password,
-            displayName
-          );
-          Alert.alert(
-            "Success",
-            `Account created successfully! Welcome, ${displayName}!`
-          );
-          router.replace("/(tabs)");
-        }
-      } catch (error: any) {
-        Alert.alert("Error", error.message || "Invalid verification code");
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    // Original validation (before verification)
+    // Validation
     if (!phoneNumber.trim()) {
       Alert.alert("Error", "Please enter your phone number");
       return;
@@ -148,10 +72,74 @@ const AuthScreen = () => {
       }
     }
 
-    // Send verification code
-    const fullPhoneNumber =
-      selectedCountry.dial_code + phoneNumber.replace(/\D/g, "");
-    await sendVerificationCode(fullPhoneNumber);
+    setLoading(true);
+
+    try {
+      const fullPhoneNumber = selectedCountry.dial_code + phoneNumber.replace(/\D/g, "");
+
+      if (isLogin) {
+        // Try remote login first
+        try {
+          const remoteUser = await loginRemote(fullPhoneNumber, password);
+          await initAuth(); // Initialize auth tokens
+          
+          // Update local database with remote user info
+          await loginLocalUser(fullPhoneNumber, password);
+          
+          Alert.alert("Success", `Welcome back, ${remoteUser.displayName || "Writer"}!`);
+          router.replace("/(tabs)");
+        } catch (remoteError: any) {
+          console.log("Remote login failed, trying local:", remoteError.message);
+          
+          // Fallback to local login
+          try {
+            const localUser = await loginLocalUser(fullPhoneNumber, password);
+            Alert.alert(
+              "Success",
+              `Welcome back, ${localUser.displayName || "Writer"}! (Offline mode)`
+            );
+            router.replace("/(tabs)");
+          } catch (localError: any) {
+            throw new Error(localError.message || "Invalid credentials");
+          }
+        }
+      } else {
+        // Registration
+        try {
+          // Try remote registration first
+          const remoteUser = await registerRemote(fullPhoneNumber, password, displayName);
+          await initAuth(); // Initialize auth tokens
+          
+          // Also create local user
+          await registerLocalUser(fullPhoneNumber, password, displayName);
+          
+          Alert.alert(
+            "Success",
+            `Account created successfully! Welcome, ${displayName}!`
+          );
+          router.replace("/(tabs)");
+        } catch (remoteError: any) {
+          console.log("Remote registration failed, creating local account:", remoteError.message);
+          
+          // Fallback to local registration only
+          try {
+            const localUser = await registerLocalUser(fullPhoneNumber, password, displayName);
+            Alert.alert(
+              "Success",
+              `Account created locally! Welcome, ${displayName}! (You can sync later when online)`
+            );
+            router.replace("/(tabs)");
+          } catch (localError: any) {
+            throw new Error(localError.message || "Registration failed");
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error("Auth error:", error);
+      Alert.alert("Error", error.message || "Authentication failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSkip = () => {
@@ -168,7 +156,6 @@ const AuthScreen = () => {
     );
   };
 
-  // Format phone number as user types
   const formatPhoneNumber = (text: string) => {
     const cleaned = text.replace(/\D/g, "");
 
@@ -177,10 +164,7 @@ const AuthScreen = () => {
     } else if (cleaned.length <= 6) {
       return `${cleaned.slice(0, 3)} ${cleaned.slice(3)}`;
     } else {
-      return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(
-        6,
-        10
-      )}`;
+      return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(6, 10)}`;
     }
   };
 
@@ -267,38 +251,24 @@ const AuthScreen = () => {
               {/* Toggle Tabs */}
               <View className="flex-row bg-light-100 dark:bg-dark-100 rounded-2xl p-1 mb-6">
                 <TouchableOpacity
-                  onPress={() => {
-                    setIsLogin(true);
-                    setIsVerifying(false);
-                  }}
-                  className={`flex-1 py-3 rounded-xl ${
-                    isLogin ? "bg-primary" : ""
-                  }`}
+                  onPress={() => setIsLogin(true)}
+                  className={`flex-1 py-3 rounded-xl ${isLogin ? "bg-primary" : ""}`}
                 >
                   <Text
                     className={`text-center font-bold ${
-                      isLogin
-                        ? "text-white"
-                        : "text-gray-600 dark:text-light-200"
+                      isLogin ? "text-white" : "text-gray-600 dark:text-light-200"
                     }`}
                   >
                     Login
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => {
-                    setIsLogin(false);
-                    setIsVerifying(false);
-                  }}
-                  className={`flex-1 py-3 rounded-xl ${
-                    !isLogin ? "bg-primary" : ""
-                  }`}
+                  onPress={() => setIsLogin(false)}
+                  className={`flex-1 py-3 rounded-xl ${!isLogin ? "bg-primary" : ""}`}
                 >
                   <Text
                     className={`text-center font-bold ${
-                      !isLogin
-                        ? "text-white"
-                        : "text-gray-600 dark:text-light-200"
+                      !isLogin ? "text-white" : "text-gray-600 dark:text-light-200"
                     }`}
                   >
                     Register
@@ -308,7 +278,7 @@ const AuthScreen = () => {
 
               {/* Input Fields */}
               <View className="gap-4">
-                {!isLogin && !isVerifying && (
+                {!isLogin && (
                   <View>
                     <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
                       Display Name
@@ -328,142 +298,81 @@ const AuthScreen = () => {
                   </View>
                 )}
 
-                {!isVerifying ? (
-                  <>
-                    <View>
-                      <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
-                        Phone Number
+                <View>
+                  <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
+                    Phone Number
+                  </Text>
+                  <View className="flex-row gap-2">
+                    <TouchableOpacity
+                      onPress={() => setShowCountryPicker(true)}
+                      className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center min-w-20"
+                      disabled={loading}
+                    >
+                      <Text className="text-gray-900 dark:text-light-100">
+                        {selectedCountry.dial_code}
                       </Text>
-                      <View className="flex-row gap-2">
-                        <TouchableOpacity
-                          onPress={() => setShowCountryPicker(true)}
-                          className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center min-w-20"
-                          disabled={loading}
-                        >
-                          <Text className="text-gray-900 dark:text-light-100">
-                            {selectedCountry.dial_code}
-                          </Text>
-                          <Text className="text-gray-900 dark:text-light-100 ml-1">
-                            ▼
-                          </Text>
-                        </TouchableOpacity>
-                        <View className="flex-1 bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
-                          
-                          <TextInput
-                            value={phoneNumber}
-                            onChangeText={handlePhoneNumberChange}
-                            placeholder="Your phone number"
-                            placeholderTextColor="#9CA3AF"
-                            keyboardType="phone-pad"
-                            className="flex-1 text-gray-900 dark:text-light-100"
-                            editable={!loading}
-                          />
-                        </View>
-                      </View>
-                    </View>
-
-                    {!isLogin && (
-                      <>
-                        <View>
-                          <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
-                            Password
-                          </Text>
-                          <View className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
-                            <Text className="text-xl mr-2">🔒</Text>
-                            <TextInput
-                              value={password}
-                              onChangeText={setPassword}
-                              placeholder="Enter password"
-                              placeholderTextColor="#9CA3AF"
-                              secureTextEntry={!showPassword}
-                              className="flex-1 text-gray-900 dark:text-light-100"
-                              editable={!loading}
-                            />
-                            <TouchableOpacity
-                              onPress={() => setShowPassword(!showPassword)}
-                              disabled={loading}
-                            >
-                              <Text className="text-xl">
-                                {showPassword ? "👁️" : "👁️‍🗨️"}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                          <Text className="text-xs text-gray-500 dark:text-light-200 mt-1 ml-1">
-                            Minimum 6 characters
-                          </Text>
-                        </View>
-
-                        <View>
-                          <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
-                            Confirm Password
-                          </Text>
-                          <View className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
-                            <Text className="text-xl mr-2">🔒</Text>
-                            <TextInput
-                              value={confirmPassword}
-                              onChangeText={setConfirmPassword}
-                              placeholder="Confirm password"
-                              placeholderTextColor="#9CA3AF"
-                              secureTextEntry={!showPassword}
-                              className="flex-1 text-gray-900 dark:text-light-100"
-                              editable={!loading}
-                            />
-                          </View>
-                        </View>
-                      </>
-                    )}
-
-                    {isLogin && (
-                      <View>
-                        <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
-                          Password
-                        </Text>
-                        <View className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
-                          <Text className="text-xl mr-2">🔒</Text>
-                          <TextInput
-                            value={password}
-                            onChangeText={setPassword}
-                            placeholder="Enter password"
-                            placeholderTextColor="#9CA3AF"
-                            secureTextEntry={!showPassword}
-                            className="flex-1 text-gray-900 dark:text-light-100"
-                            editable={!loading}
-                          />
-                          <TouchableOpacity
-                            onPress={() => setShowPassword(!showPassword)}
-                            disabled={loading}
-                          >
-                            <Text className="text-xl">
-                              {showPassword ? "👁️" : "👁️‍🗨️"}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    )}
-                  </>
-                ) : (
-                  // Verification Code Input
-                  <View>
-                    <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
-                      Verification Code
-                    </Text>
-                    <View className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
-                      <Text className="text-xl mr-2">🔢</Text>
+                      <Text className="text-gray-900 dark:text-light-100 ml-1">▼</Text>
+                    </TouchableOpacity>
+                    <View className="flex-1 bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
                       <TextInput
-                        value={verificationCode}
-                        onChangeText={setVerificationCode}
-                        placeholder="Enter 6-digit code"
+                        value={phoneNumber}
+                        onChangeText={handlePhoneNumberChange}
+                        placeholder="Your phone number"
                         placeholderTextColor="#9CA3AF"
-                        keyboardType="number-pad"
+                        keyboardType="phone-pad"
                         className="flex-1 text-gray-900 dark:text-light-100"
                         editable={!loading}
-                        maxLength={6}
                       />
                     </View>
+                  </View>
+                </View>
+
+                <View>
+                  <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
+                    Password
+                  </Text>
+                  <View className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
+                    <Text className="text-xl mr-2">🔒</Text>
+                    <TextInput
+                      value={password}
+                      onChangeText={setPassword}
+                      placeholder="Enter password"
+                      placeholderTextColor="#9CA3AF"
+                      secureTextEntry={!showPassword}
+                      className="flex-1 text-gray-900 dark:text-light-100"
+                      editable={!loading}
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowPassword(!showPassword)}
+                      disabled={loading}
+                    >
+                      <Text className="text-xl">{showPassword ? "👁️" : "👁️‍🗨️"}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {!isLogin && (
                     <Text className="text-xs text-gray-500 dark:text-light-200 mt-1 ml-1">
-                      Enter the code sent to {selectedCountry.dial_code}
-                      {phoneNumber}
+                      Minimum 6 characters
                     </Text>
+                  )}
+                </View>
+
+                {!isLogin && (
+                  <View>
+                    <Text className="text-sm font-semibold text-gray-700 dark:text-light-100 mb-2">
+                      Confirm Password
+                    </Text>
+                    <View className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
+                      <Text className="text-xl mr-2">🔒</Text>
+                      <TextInput
+                        value={confirmPassword}
+                        onChangeText={setConfirmPassword}
+                        placeholder="Confirm password"
+                        placeholderTextColor="#9CA3AF"
+                        secureTextEntry={!showPassword}
+                        className="flex-1 text-gray-900 dark:text-light-100"
+                        editable={!loading}
+                      />
+                    </View>
                   </View>
                 )}
               </View>
@@ -472,43 +381,21 @@ const AuthScreen = () => {
               <TouchableOpacity
                 onPress={handleAuth}
                 disabled={loading}
-                className={`mt-6 py-4 rounded-xl ${
-                  loading ? "bg-gray-300" : "bg-primary"
-                }`}
+                className={`mt-6 py-4 rounded-xl ${loading ? "bg-gray-300" : "bg-primary"}`}
               >
                 <Text className="text-white font-bold text-center text-lg">
-                  {loading
-                    ? "Please wait..."
-                    : isVerifying
-                    ? "Verify Code"
-                    : isLogin
-                    ? "Login"
-                    : "Create Account"}
+                  {loading ? "Please wait..." : isLogin ? "Login" : "Create Account"}
                 </Text>
               </TouchableOpacity>
 
-              {/* Back to phone input during verification */}
-              {isVerifying && (
-                <TouchableOpacity
-                  onPress={() => setIsVerifying(false)}
-                  className="mt-4"
-                  disabled={loading}
-                >
-                  <Text className="text-primary text-center font-semibold">
-                    Change Phone Number
-                  </Text>
-                </TouchableOpacity>
-              )}
-
               {/* Additional Info */}
-              {!isLogin && !isVerifying && (
+              {!isLogin && (
                 <Text className="text-xs text-gray-500 dark:text-light-200 text-center mt-4">
-                  By creating an account, you agree to our Terms of Service and
-                  Privacy Policy
+                  By creating an account, you agree to our Terms of Service and Privacy Policy
                 </Text>
               )}
 
-              {isLogin && !isVerifying && (
+              {isLogin && (
                 <TouchableOpacity
                   onPress={() =>
                     Alert.alert(
@@ -536,6 +423,7 @@ const AuthScreen = () => {
                 Continue as Guest
               </Text>
             </TouchableOpacity>
+            
             <TouchableOpacity
               onPress={() => router.push("/")}
               className="bg-light-100 dark:bg-dark-100 rounded-2xl py-4 mb-6"
@@ -553,17 +441,15 @@ const AuthScreen = () => {
               </Text>
               <View className="gap-3">
                 {[
-                  { icon: "💾", text: "Save your profile locally" },
-                  { icon: "⚙️", text: "Persist your settings" },
+                  { icon: "💾", text: "Sync across devices" },
+                  { icon: "☁️", text: "Cloud backup" },
                   { icon: "📊", text: "Track your writing stats" },
-                  { icon: "🖼️", text: "Upload profile pictures" },
+                  { icon: "🌐", text: "Share your work" },
                   { icon: "🎯", text: "Set writing goals" },
                 ].map((feature, index) => (
                   <View key={index} className="flex-row items-center">
                     <Text className="text-2xl mr-3">{feature.icon}</Text>
-                    <Text className="text-gray-700 dark:text-light-100">
-                      {feature.text}
-                    </Text>
+                    <Text className="text-gray-700 dark:text-light-100">{feature.text}</Text>
                   </View>
                 ))}
               </View>

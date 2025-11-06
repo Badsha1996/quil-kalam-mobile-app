@@ -8,6 +8,9 @@ import {
   updateDailyGoal,
   clearActiveSession,
 } from "@/utils/database";
+
+// Remove this line
+import { syncUserProfile } from "@/utils/syncHelper";
 // @ts-ignore
 import * as ImagePicker from "expo-image-picker";
 // @ts-ignore
@@ -39,6 +42,7 @@ const Profile = () => {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [showGoalEditor, setShowGoalEditor] = useState(false);
   const [tempGoal, setTempGoal] = useState("");
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     loadData();
@@ -85,22 +89,35 @@ const Profile = () => {
     }
   };
 
-  const handleUpdateProfile = () => {
-    if (!user) return;
+ const handleUpdateProfile = async () => {
+  if (!user) return;
 
-    try {
-      updateUserProfile(user.id, {
-        displayName: editForm.displayName.trim(),
-        email: editForm.email.trim(),
-        bio: editForm.bio.trim(),
-      });
-      setIsEditingProfile(false);
-      loadData(); // Reload to get updated user data
-      Alert.alert("Success", "Profile updated successfully!");
-    } catch (error) {
-      Alert.alert("Error", "Failed to update profile");
+  setLoading(true);
+  try {
+    const result = await syncUserProfile({
+      displayName: editForm.displayName.trim(),
+      email: editForm.email.trim(),
+      bio: editForm.bio.trim(),
+    });
+
+    if (result.synced) {
+      Alert.alert("Success", "Profile updated and synced to cloud!");
+    } else if (result.local) {
+      Alert.alert(
+        "Saved Locally",
+        "Profile saved locally. Will sync when you're online."
+      );
     }
-  };
+
+    // Refresh user data
+    setUser(getCurrentUser());
+    setIsEditingProfile(false);
+  } catch (error: any) {
+    Alert.alert("Error", error.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handlePickImage = async () => {
     try {

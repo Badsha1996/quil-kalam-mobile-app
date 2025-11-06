@@ -7,6 +7,7 @@ export const db = SQLite.openDatabaseSync("quilkalam.db");
 
 // ==================== PASSWORD HASHING ====================
 
+// @ts-ignore
 const hashPassword = async (password: string): Promise<string> => {
   const hash = await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
@@ -18,7 +19,8 @@ const hashPassword = async (password: string): Promise<string> => {
 const verifyPassword = async (
   password: string,
   hash: string
-): Promise<boolean> => {
+): // @ts-ignore
+Promise<boolean> => {
   const newHash = await hashPassword(password);
   return newHash === hash;
 };
@@ -2247,6 +2249,8 @@ export const importProjectFromJSON = (jsonData: string) => {
     }
 
     // Import folders (with mapping for parent relationships)
+
+    // @ts-ignore
     const folderMap = new Map();
     if (data.folders) {
       data.folders.forEach((folder: any) => {
