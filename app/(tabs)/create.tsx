@@ -339,7 +339,7 @@ const create = () => {
           </View>
 
           {/*  ********************************** BUTTONS ***********************************/}
-          <View className="px-6">
+          <View className="px-6 mb-8">
             <TouchableOpacity
               onPress={handleCreateProject}
               className="bg-secondary px-8 py-5 rounded-full active:opacity-80 mb-4"
@@ -352,15 +352,22 @@ const create = () => {
               }}
             >
               <Text className="text-dark-300 font-bold text-lg text-center">
-                🚀 Create Project
+                Create Project
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => resetForm()}
-              className="py-3 active:opacity-60"
+              className="bg-gray-200 px-8 py-5 rounded-full active:opacity-80 mb-4"
+              style={{
+                shadowColor: "#FFC2C7",
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.3,
+                shadowRadius: 16,
+                elevation: 8,
+              }}
             >
-              <Text className="text-gray-600 dark:text-light-100 text-base text-center font-semibold">
+              <Text className="text-gray-600   text-base text-center font-semibold">
                 Cancel
               </Text>
             </TouchableOpacity>

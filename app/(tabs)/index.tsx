@@ -90,7 +90,7 @@ export default function Index() {
           </Animated.View>
         </View>
 
-        <View className="px-5 mb-10">
+        {/* <View className="px-5 mb-10">
           <View className="flex-row justify-between">
             {Stat.map((s, i) => (
               <StatCard
@@ -102,7 +102,7 @@ export default function Index() {
               />
             ))}
           </View>
-        </View>
+        </View> */}
 
         <View className="px-6">
           <Text className="text-3xl font-extrabold text-gray-900 dark:text-white mb-6 text-center">
