@@ -1,8 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import RNFS from "react-native-fs";
 
 const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || "https://quilkalam-backend.vercel.app";
+  process.env.EXPO_PUBLIC_API_URL || "https://quilkalam-backend.vercel.app/api";
 
 // ==================== AUTH HELPERS ====================
 
@@ -11,10 +10,16 @@ let userId: string | null = null;
 
 export const initAuth = async () => {
   try {
-    authToken = await AsyncStorage.getItem("auth_token");
-    userId = await AsyncStorage.getItem("user_id");
+    const values = await AsyncStorage.multiGet(["auth_token", "user_id"]);
+    authToken = values[0][1];
+    userId = values[1][1];
+
+    return { success: true };
   } catch (error) {
     console.error("Error initializing auth:", error);
+    authToken = null;
+    userId = null;
+    throw error;
   }
 };
 
@@ -59,7 +64,7 @@ export const registerUser = async (
   displayName?: string
 ) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phoneNumber, password, displayName }),
@@ -77,7 +82,6 @@ export const registerUser = async (
 
     return data.user;
   } catch (error: any) {
-    console.error("Registration error:", error);
     // Return more specific error messages
     if (error.message.includes("fetch")) {
       throw new Error("Network error. Please check your internet connection.");
@@ -88,7 +92,7 @@ export const registerUser = async (
 
 export const loginUser = async (phoneNumber: string, password: string) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phoneNumber, password }),
@@ -126,7 +130,7 @@ export const updateUserProfile = async (updates: {
   profileImage?: string;
 }) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/user/profile`, {
+    const response = await fetch(`${API_BASE_URL}/user/profile`, {
       method: "PUT",
       headers: getAuthHeaders(),
       body: JSON.stringify(updates),
@@ -139,9 +143,9 @@ export const updateUserProfile = async (updates: {
       );
     }
 
-    return await response.json();
+    const data = await response.json();
+    return data.user;
   } catch (error: any) {
-    console.error("Profile update error:", error);
     if (error.message.includes("fetch")) {
       throw new Error("Network error. Please check your internet connection.");
     }
@@ -154,7 +158,7 @@ export const changePassword = async (
   newPassword: string
 ) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+    const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ oldPassword, newPassword }),
@@ -175,8 +179,6 @@ export const changePassword = async (
   }
 };
 
-
-
 // ==================== PROJECT PUBLISHING ====================
 
 export const publishProject = async (projectData: {
@@ -187,6 +189,7 @@ export const publishProject = async (projectData: {
   genre?: string;
   authorName?: string;
   coverImage?: string;
+  backImage?: string; // Changed from backCoverImage to backImage
   wordCount: number;
   items: any[];
   settings?: any;
@@ -196,6 +199,11 @@ export const publishProject = async (projectData: {
       throw new Error("User not authenticated");
     }
 
+    // Filter only chapters/documents, exclude folders and other item types
+    const chapterItems = projectData.items.filter(
+      (item) => item.itemType === "document" || item.itemType === "chapter"
+    );
+
     const payload = {
       type: projectData.type,
       title: projectData.title,
@@ -203,6 +211,7 @@ export const publishProject = async (projectData: {
       genre: projectData.genre,
       authorName: projectData.authorName,
       coverImage: projectData.coverImage,
+      backImage: projectData.backImage, // Changed to match backend
       wordCount: projectData.wordCount,
       isbn: projectData.settings?.isbn,
       publisher: projectData.settings?.publisher,
@@ -215,33 +224,69 @@ export const publishProject = async (projectData: {
       isPublic: projectData.settings?.is_public ?? true,
       allowComments: projectData.settings?.allow_comments ?? true,
       allowDownloads: projectData.settings?.allow_downloads ?? false,
-      items: projectData.items.map((item) => ({
-        parentItemId: item.parent_item_id,
-        itemType: item.item_type,
-        name: item.name,
-        description: item.description,
-        content: item.content,
-        metadata: item.metadata ? JSON.parse(item.metadata) : null,
-        orderIndex: item.order_index,
-        depthLevel: item.depth_level,
-        wordCount: item.word_count,
-      })),
+      items: chapterItems.map((item) => {
+        const parentItemId = item.parent_item_id
+          ? String(item.parent_item_id)
+          : "";
+
+        const itemType = item.item_type || "document";
+
+        let parsedMetadata = null;
+        if (item.metadata) {
+          try {
+            parsedMetadata =
+              typeof item.metadata === "string"
+                ? JSON.parse(item.metadata)
+                : item.metadata;
+          } catch (e) {
+            console.warn("Failed to parse metadata:", e);
+            parsedMetadata = null;
+          }
+        }
+
+        return {
+          parentItemId: parentItemId,
+          itemType: itemType,
+          name: item.name || "",
+          description: item.description || "",
+          content: item.content || "",
+          metadata: parsedMetadata,
+          orderIndex: item.order_index || 0,
+          depthLevel: item.depth_level || 0,
+          wordCount: item.word_count || 0,
+        };
+      }),
     };
 
-    const response = await fetch(`${API_BASE_URL}/api/projects/publish`, {
+    console.log("Publishing payload:", {
+      ...payload,
+      coverImage: payload.coverImage
+        ? `base64 (${payload.coverImage.length} chars)`
+        : null,
+      backImage: payload.backImage
+        ? `base64 (${payload.backImage.length} chars)`
+        : null,
+    });
+
+    const response = await fetch(`${API_BASE_URL}/projects/publish`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const error = await response.json();
       throw new Error(
-        error.error || error.message || "Failed to publish project"
+        data.error || data.message || "Failed to publish project"
       );
     }
 
-    return await response.json();
+    if (data.success && data.projectId) {
+      return data;
+    } else {
+      throw new Error("Invalid response format from server");
+    }
   } catch (error: any) {
     console.error("Publish error:", error);
     if (error.message.includes("fetch")) {
@@ -254,7 +299,7 @@ export const publishProject = async (projectData: {
 export const unpublishProject = async (publishedProjectId: string) => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/api/projects/${publishedProjectId}`,
+      `${API_BASE_URL}/projects/${publishedProjectId}`,
       {
         method: "DELETE",
         headers: getAuthHeaders(),
@@ -280,6 +325,7 @@ export const unpublishProject = async (publishedProjectId: string) => {
 
 // ==================== BROWSE PUBLISHED WORKS ====================
 
+// Replace this function in your api.ts file
 export const getPublishedProjects = async (filters?: {
   genre?: string;
   type?: string;
@@ -291,6 +337,8 @@ export const getPublishedProjects = async (filters?: {
 }) => {
   try {
     const params = new URLSearchParams();
+
+    // Only add parameters if they exist and have values
     if (filters?.genre) params.append("genre", filters.genre);
     if (filters?.type) params.append("type", filters.type);
     if (filters?.search) params.append("search", filters.search);
@@ -299,7 +347,12 @@ export const getPublishedProjects = async (filters?: {
     if (filters?.limit) params.append("limit", filters.limit.toString());
     if (filters?.sortBy) params.append("sortBy", filters.sortBy);
 
-    const response = await fetch(`${API_BASE_URL}/api/projects?${params}`, {
+    const queryString = params.toString();
+    const url = queryString
+      ? `${API_BASE_URL}/projects?${queryString}`
+      : `${API_BASE_URL}/projects`;
+
+    const response = await fetch(url, {
       headers: getAuthHeaders(),
     });
 
@@ -334,7 +387,7 @@ export const addChapter = async (
 ) => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/api/projects/${projectId}/chapters`,
+      `${API_BASE_URL}/projects/${projectId}/chapters`,
       {
         method: "POST",
         headers: getAuthHeaders(),
@@ -364,7 +417,7 @@ export const addChapter = async (
 
 export const likeProject = async (projectId: string) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/likes`, {
+    const response = await fetch(`${API_BASE_URL}/likes`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ projectId }),
@@ -391,7 +444,7 @@ export const addComment = async (
   parentCommentId?: string
 ) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/comments`, {
+    const response = await fetch(`${API_BASE_URL}/comments`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ projectId, content, parentCommentId }),
@@ -416,7 +469,7 @@ export const addComment = async (
 
 export const followUser = async (followingId: string) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/follows`, {
+    const response = await fetch(`${API_BASE_URL}/follows`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ followingId }),
@@ -445,7 +498,7 @@ export const updateReadingProgress = async (
   progressPercentage: number
 ) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/reading-progress`, {
+    const response = await fetch(`${API_BASE_URL}/reading-progress`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ projectId, lastReadItemId, progressPercentage }),
@@ -476,13 +529,63 @@ export const convertImageToBase64 = async (
   imageUri: string
 ): Promise<string> => {
   try {
-    const base64 = await FileSystem.readAsStringAsync(imageUri, {
-      encoding: FileSystem.EncodingType.Base64,
+    console.log("Converting image to base64:", imageUri);
+
+    // Check if the URI is already a base64 data URL
+    if (imageUri.startsWith("data:")) {
+      console.log("Image is already base64, returning as-is");
+      return imageUri;
+    }
+
+    // For file:// URIs, read the file and convert to base64
+    if (imageUri.startsWith("file://")) {
+      console.log("Reading file from filesystem...");
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Determine MIME type from file extension
+      let mimeType = "image/jpeg"; // default
+      if (imageUri.toLowerCase().endsWith(".png")) {
+        mimeType = "image/png";
+      } else if (imageUri.toLowerCase().endsWith(".gif")) {
+        mimeType = "image/gif";
+      } else if (imageUri.toLowerCase().endsWith(".webp")) {
+        mimeType = "image/webp";
+      }
+
+      const dataUrl = `data:${mimeType};base64,${base64}`;
+      console.log(
+        "Successfully converted image to base64, length:",
+        dataUrl.length
+      );
+      return dataUrl;
+    }
+
+    // For other URI types (http, https, etc.), try to fetch and convert
+    console.log("Fetching image from URL...");
+    const response = await fetch(imageUri);
+    const blob = await response.blob();
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === "string") {
+          console.log(
+            "Successfully converted URL image to base64, length:",
+            reader.result.length
+          );
+          resolve(reader.result);
+        } else {
+          reject(new Error("Failed to convert image to base64"));
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
     });
-    return `data:image/jpeg;base64,${base64}`;
   } catch (error) {
     console.error("Error converting image to base64:", error);
-    throw error;
+    throw new Error(`Failed to convert image: ${error}`);
   }
 };
 
@@ -493,7 +596,7 @@ export const uploadImage = async (
   try {
     const base64 = await convertImageToBase64(imageUri);
 
-    const response = await fetch(`${API_BASE_URL}/api/upload/image`, {
+    const response = await fetch(`${API_BASE_URL}/upload/image`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({
@@ -534,12 +637,18 @@ export const updatePublishedProject = async (
     );
 
     if (!response.ok) {
-      throw new Error("Failed to update project");
+      const error = await response.json();
+      throw new Error(
+        error.error || error.message || "Failed to update project"
+      );
     }
 
     return await response.json();
-  } catch (error) {
+  } catch (error: any) {
     console.error("Update error:", error);
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
+    }
     throw error;
   }
 };
@@ -566,14 +675,18 @@ export const getPublishedProject = async (projectId: string) => {
 export const getPublishedProjectItems = async (projectId: string) => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/projects/${projectId}/items`,
+      `${API_BASE_URL}/projects/${projectId}/chapters`,
       {
         headers: getAuthHeaders(),
       }
     );
 
+    console.log(response)
+
     if (!response.ok) {
-      throw new Error("Failed to fetch project items");
+      const text = await response.text();
+      console.error("Server response:", response.status, text);
+      throw new Error(`HTTP ${response.status}`);
     }
 
     return await response.json();
@@ -597,7 +710,7 @@ export const updateChapter = async (
 ) => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/api/projects/${projectId}/chapters/${chapterId}`,
+      `${API_BASE_URL}/projects/${projectId}/chapters/${chapterId}`,
       {
         method: "PUT",
         headers: getAuthHeaders(),
@@ -617,10 +730,40 @@ export const updateChapter = async (
   }
 };
 
+export const updateAllChapter = async (
+  publishedProjectId: string,
+  chapterUpdates: any
+) => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/projects/${publishedProjectId}/chapters/batch`,
+      {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          updates: chapterUpdates,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to update chapters");
+    }
+
+    const result = await response.json();
+
+    return result;
+  } catch (error) {
+    console.error("Update chapter error:", error);
+    throw error;
+  }
+};
+
 export const deleteChapter = async (projectId: string, chapterId: string) => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/api/projects/${projectId}/chapters/${chapterId}`,
+      `${API_BASE_URL}/projects/${projectId}/chapters/${chapterId}`,
       {
         method: "DELETE",
         headers: getAuthHeaders(),
@@ -642,7 +785,7 @@ export const deleteChapter = async (projectId: string, chapterId: string) => {
 export const getChapters = async (projectId: string) => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/api/projects/${projectId}/chapters`,
+      `${API_BASE_URL}/projects/${projectId}/chapters`,
       {
         headers: getAuthHeaders(),
       }
@@ -661,7 +804,7 @@ export const getChapters = async (projectId: string) => {
 
 export const unlikeProject = async (projectId: string) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/likes`, {
+    const response = await fetch(`${API_BASE_URL}/likes`, {
       method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ projectId }),
@@ -681,7 +824,7 @@ export const unlikeProject = async (projectId: string) => {
 export const getComments = async (projectId: string, page = 1, limit = 20) => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/api/comments?projectId=${projectId}`, // Changed endpoint and params
+      `${API_BASE_URL}/comments?projectId=${projectId}`, // Changed endpoint and params
       { headers: getAuthHeaders() }
     );
 
@@ -698,14 +841,11 @@ export const getComments = async (projectId: string, page = 1, limit = 20) => {
 
 export const deleteComment = async (commentId: string) => {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/api/comments?id=${commentId}`,
-      {
-        // Changed to query param
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      }
-    );
+    const response = await fetch(`${API_BASE_URL}/comments?id=${commentId}`, {
+      // Changed to query param
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
 
     if (!response.ok) {
       throw new Error("Failed to delete comment");
@@ -741,7 +881,7 @@ export const updateComment = async (commentId: string, content: string) => {
 
 export const unfollowUser = async (followingId: string) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/follows`, {
+    const response = await fetch(`${API_BASE_URL}/follows`, {
       // Same endpoint, toggles
       method: "POST",
       headers: getAuthHeaders(),
@@ -761,17 +901,29 @@ export const unfollowUser = async (followingId: string) => {
 
 export const getUserProfile = async (userId: string) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+    const response = await fetch(`${API_BASE_URL}/user/profile`, {
+      method: "GET",
       headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
-      throw new Error("Failed to fetch user profile");
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.error ||
+          errorData.message ||
+          `HTTP ${response.status}: Failed to fetch user profile`
+      );
     }
 
-    return await response.json();
-  } catch (error) {
-    console.error("Fetch profile error:", error);
+    const data = await response.json();
+
+    return data.user;
+  } catch (error: any) {
+    if (error.message.includes("fetch") || error.message.includes("Network")) {
+      return {};
+    }
+
+    // Re-throw other errors
     throw error;
   }
 };
@@ -825,7 +977,7 @@ export const getUserFollowing = async (
 export const getReadingProgress = async (projectId: string) => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/api/reading-progress?projectId=${projectId}`,
+      `${API_BASE_URL}/reading-progress?projectId=${projectId}`,
       {
         headers: getAuthHeaders(),
       }

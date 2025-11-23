@@ -122,11 +122,11 @@ const create = () => {
         );
       }
     } catch (error) {
-      console.error("Error creating project:", error);
-
       Alert.alert("Error", "Failed to create project. Please try again.", [
         { text: "OK" },
       ]);
+    } finally {
+      resetForm();
     }
   };
 

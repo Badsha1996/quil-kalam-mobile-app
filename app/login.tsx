@@ -1,7 +1,11 @@
 import Background from "@/components/common/Background";
 import { countries } from "@/constants/login";
-import { registerLocalUser, loginLocalUser, setActiveSession } from "@/utils/database";
-import { registerUser as registerRemote, loginUser as loginRemote, initAuth } from "@/utils/api";
+import {
+  registerUser as registerRemote,
+  loginUser as loginRemote,
+  initAuth,
+} from "@/utils/api";
+import { setActiveSession, setSetting } from "@/utils/database";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -75,64 +79,47 @@ const AuthScreen = () => {
     setLoading(true);
 
     try {
-      const fullPhoneNumber = selectedCountry.dial_code + phoneNumber.replace(/\D/g, "");
+      const fullPhoneNumber =
+        selectedCountry.dial_code + phoneNumber.replace(/\D/g, "");
 
       if (isLogin) {
-        // Try remote login first
-        try {
-          const remoteUser = await loginRemote(fullPhoneNumber, password);
-          await initAuth(); // Initialize auth tokens
-          
-          // Update local database with remote user info
-          await loginLocalUser(fullPhoneNumber, password);
-          
-          Alert.alert("Success", `Welcome back, ${remoteUser.displayName || "Writer"}!`);
-          router.replace("/(tabs)");
-        } catch (remoteError: any) {
-          console.log("Remote login failed, trying local:", remoteError.message);
-          
-          // Fallback to local login
-          try {
-            const localUser = await loginLocalUser(fullPhoneNumber, password);
-            Alert.alert(
-              "Success",
-              `Welcome back, ${localUser.displayName || "Writer"}! (Offline mode)`
-            );
-            router.replace("/(tabs)");
-          } catch (localError: any) {
-            throw new Error(localError.message || "Invalid credentials");
-          }
-        }
+        // Remote login only
+        const remoteUser = await loginRemote(fullPhoneNumber, password);
+        await initAuth();
+
+        // Save user data locally as backup
+        setSetting("user_display_name", remoteUser.displayName || "");
+        setSetting("user_phone_number", fullPhoneNumber);
+        setSetting("user_email", remoteUser.email || "");
+
+        setActiveSession(remoteUser.id);
+
+        Alert.alert(
+          "Success",
+          `Welcome back, ${remoteUser.displayName || "Writer"}!`
+        );
+        router.replace("/(tabs)");
       } else {
-        // Registration
-        try {
-          // Try remote registration first
-          const remoteUser = await registerRemote(fullPhoneNumber, password, displayName);
-          await initAuth(); // Initialize auth tokens
-          
-          // Also create local user
-          await registerLocalUser(fullPhoneNumber, password, displayName);
-          
-          Alert.alert(
-            "Success",
-            `Account created successfully! Welcome, ${displayName}!`
-          );
-          router.replace("/(tabs)");
-        } catch (remoteError: any) {
-          console.log("Remote registration failed, creating local account:", remoteError.message);
-          
-          // Fallback to local registration only
-          try {
-            const localUser = await registerLocalUser(fullPhoneNumber, password, displayName);
-            Alert.alert(
-              "Success",
-              `Account created locally! Welcome, ${displayName}! (You can sync later when online)`
-            );
-            router.replace("/(tabs)");
-          } catch (localError: any) {
-            throw new Error(localError.message || "Registration failed");
-          }
-        }
+        // Remote registration only
+        const remoteUser = await registerRemote(
+          fullPhoneNumber,
+          password,
+          displayName
+        );
+        await initAuth();
+
+        // Save user data locally as backup
+        setSetting("user_display_name", displayName);
+        setSetting("user_phone_number", fullPhoneNumber);
+        setSetting("user_email", remoteUser.email || "");
+
+        setActiveSession(remoteUser.id);
+
+        Alert.alert(
+          "Success",
+          `Account created successfully! Welcome, ${displayName}!`
+        );
+        router.replace("/(tabs)");
       }
     } catch (error: any) {
       console.error("Auth error:", error);
@@ -164,7 +151,10 @@ const AuthScreen = () => {
     } else if (cleaned.length <= 6) {
       return `${cleaned.slice(0, 3)} ${cleaned.slice(3)}`;
     } else {
-      return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(6, 10)}`;
+      return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 6)} ${cleaned.slice(
+        6,
+        10
+      )}`;
     }
   };
 
@@ -252,11 +242,15 @@ const AuthScreen = () => {
               <View className="flex-row bg-light-100 dark:bg-dark-100 rounded-2xl p-1 mb-6">
                 <TouchableOpacity
                   onPress={() => setIsLogin(true)}
-                  className={`flex-1 py-3 rounded-xl ${isLogin ? "bg-primary" : ""}`}
+                  className={`flex-1 py-3 rounded-xl ${
+                    isLogin ? "bg-primary" : ""
+                  }`}
                 >
                   <Text
                     className={`text-center font-bold ${
-                      isLogin ? "text-white" : "text-gray-600 dark:text-light-200"
+                      isLogin
+                        ? "text-white"
+                        : "text-gray-600 dark:text-light-200"
                     }`}
                   >
                     Login
@@ -264,11 +258,15 @@ const AuthScreen = () => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => setIsLogin(false)}
-                  className={`flex-1 py-3 rounded-xl ${!isLogin ? "bg-primary" : ""}`}
+                  className={`flex-1 py-3 rounded-xl ${
+                    !isLogin ? "bg-primary" : ""
+                  }`}
                 >
                   <Text
                     className={`text-center font-bold ${
-                      !isLogin ? "text-white" : "text-gray-600 dark:text-light-200"
+                      !isLogin
+                        ? "text-white"
+                        : "text-gray-600 dark:text-light-200"
                     }`}
                   >
                     Register
@@ -311,7 +309,9 @@ const AuthScreen = () => {
                       <Text className="text-gray-900 dark:text-light-100">
                         {selectedCountry.dial_code}
                       </Text>
-                      <Text className="text-gray-900 dark:text-light-100 ml-1">▼</Text>
+                      <Text className="text-gray-900 dark:text-light-100 ml-1">
+                        ▼
+                      </Text>
                     </TouchableOpacity>
                     <View className="flex-1 bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
                       <TextInput
@@ -346,7 +346,9 @@ const AuthScreen = () => {
                       onPress={() => setShowPassword(!showPassword)}
                       disabled={loading}
                     >
-                      <Text className="text-xl">{showPassword ? "👁️" : "👁️‍🗨️"}</Text>
+                      <Text className="text-xl">
+                        {showPassword ? "👁️" : "👁️‍🗨️"}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                   {!isLogin && (
@@ -381,17 +383,24 @@ const AuthScreen = () => {
               <TouchableOpacity
                 onPress={handleAuth}
                 disabled={loading}
-                className={`mt-6 py-4 rounded-xl ${loading ? "bg-gray-300" : "bg-primary"}`}
+                className={`mt-6 py-4 rounded-xl ${
+                  loading ? "bg-gray-300" : "bg-primary"
+                }`}
               >
                 <Text className="text-white font-bold text-center text-lg">
-                  {loading ? "Please wait..." : isLogin ? "Login" : "Create Account"}
+                  {loading
+                    ? "Please wait..."
+                    : isLogin
+                    ? "Login"
+                    : "Create Account"}
                 </Text>
               </TouchableOpacity>
 
               {/* Additional Info */}
               {!isLogin && (
                 <Text className="text-xs text-gray-500 dark:text-light-200 text-center mt-4">
-                  By creating an account, you agree to our Terms of Service and Privacy Policy
+                  By creating an account, you agree to our Terms of Service and
+                  Privacy Policy
                 </Text>
               )}
 
@@ -423,7 +432,7 @@ const AuthScreen = () => {
                 Continue as Guest
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               onPress={() => router.push("/")}
               className="bg-light-100 dark:bg-dark-100 rounded-2xl py-4 mb-6"
@@ -449,7 +458,9 @@ const AuthScreen = () => {
                 ].map((feature, index) => (
                   <View key={index} className="flex-row items-center">
                     <Text className="text-2xl mr-3">{feature.icon}</Text>
-                    <Text className="text-gray-700 dark:text-light-100">{feature.text}</Text>
+                    <Text className="text-gray-700 dark:text-light-100">
+                      {feature.text}
+                    </Text>
                   </View>
                 ))}
               </View>

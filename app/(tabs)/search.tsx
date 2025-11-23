@@ -442,7 +442,7 @@ const search = () => {
           </Animated.View>
         </View>
 
-        <View className="px-6">
+        <View className="px-6 pb-8">
           {filteredProjects.length > 0 ? (
             filteredProjects.map((project, index) => (
               <ProjectCard

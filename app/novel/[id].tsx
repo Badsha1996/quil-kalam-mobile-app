@@ -9,7 +9,7 @@ import {
   structure5,
 } from "@/constants/template";
 import { ItemNode, WritingSettings } from "@/types/novelDetails";
-import { publishProject } from "@/utils/api";
+
 import {
   createItem,
   deleteItem,
@@ -30,6 +30,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { JSX, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
@@ -50,11 +51,19 @@ import {
   RichToolbar,
   actions,
 } from "react-native-pell-rich-editor";
+import {
+  publishProject,
+  unpublishProject,
+  updatePublishedProject,
+  addChapter,
+  isAuthenticated,
+  convertImageToBase64,
+  updateAllChapter,
+} from "@/utils/api";
 
 const { width, height } = Dimensions.get("window");
 
 const NovelDetails = () => {
-  const router = useRouter();
   const { id } = useLocalSearchParams();
   const projectId = parseInt(id as string);
 
@@ -134,6 +143,21 @@ const NovelDetails = () => {
   const editorRef = useRef<any>(null);
   const autoSaveTimer = useRef<any>(null);
   const scrollViewRef = useRef<any>(null);
+
+  const [publishingStatus, setPublishingStatus] = useState<
+    "idle" | "publishing" | "updating" | "syncing"
+  >("idle");
+  const [isPublished, setIsPublished] = useState(false);
+  const [publishedProjectId, setPublishedProjectId] = useState<string | null>(
+    null
+  );
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [showChapterPublishModal, setShowChapterPublishModal] = useState(false);
+  const [selectedChapterForPublish, setSelectedChapterForPublish] =
+    useState<ItemNode | null>(null);
+
+  const [isUploadingFrontCover, setIsUploadingFrontCover] = useState(false);
+  const [isUploadingBackCover, setIsUploadingBackCover] = useState(false);
 
   // ==================== Effects ====================
 
@@ -434,8 +458,9 @@ const NovelDetails = () => {
     const projectData = getProject(projectId);
     const statsData = getProjectStats(projectId);
     const allItems = getItemsByProject(projectId) as ItemNode[];
-    const publishData = getPublishingSettings(projectId);
+
     const coversData = getProjectCovers(projectId);
+    const publishData = getPublishingSettings(projectId);
 
     setProject(projectData);
     setStats(statsData);
@@ -443,8 +468,14 @@ const NovelDetails = () => {
     setPublishingSettingsState(publishData);
     setCovers(coversData);
 
+    // @ts-ignore
+
+    setIsPublished(!!publishData?.is_published);
+    // @ts-ignore
+    setPublishedProjectId(publishData?.published_project_id || null);
+
     const writingSettingsData: any = getWritingSettings(projectId);
-    console.log(statsData);
+
     if (writingSettingsData) {
       setWritingSettings({
         fontSize: writingSettingsData.font_size,
@@ -581,12 +612,37 @@ const NovelDetails = () => {
       allowsEditing: true,
       aspect: coverType === "front" ? [2, 3] : [2, 3],
       quality: 0.9,
+      base64: true,
     });
 
-    if (!result.canceled) {
-      setProjectCover(projectId, coverType, result.assets[0].uri);
-      loadProjectData();
-      Alert.alert("Success", `${coverType} cover updated!`);
+    if (!result.canceled && result.assets[0].uri) {
+      // Set loading state based on cover type
+      if (coverType === "front") {
+        setIsUploadingFrontCover(true);
+      } else {
+        setIsUploadingBackCover(true);
+      }
+
+      try {
+        // Convert image to base64 and save
+        const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
+        setProjectCover(projectId, coverType, base64Image);
+
+        loadProjectData();
+        Alert.alert("Success", `${coverType} cover updated!`);
+      } catch (error: any) {
+        Alert.alert(
+          "Error",
+          error.message || `Failed to update ${coverType} cover`
+        );
+      } finally {
+        // Reset loading state
+        if (coverType === "front") {
+          setIsUploadingFrontCover(false);
+        } else {
+          setIsUploadingBackCover(false);
+        }
+      }
     }
   };
 
@@ -1469,7 +1525,6 @@ const NovelDetails = () => {
             }`}
             style={{ marginLeft: depth * 16 }}
           >
-            {/* ... rest of the item rendering code remains the same ... */}
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center flex-1">
                 <View
@@ -1565,6 +1620,12 @@ const NovelDetails = () => {
         className="bg-primary px-4 py-2 rounded-full shadow-lg"
       >
         <Text className="text-sm font-bold text-white">👁️ Preview</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => setShowWritingSettings(true)}
+        className="w-10 h-10 rounded-full bg-light-100 dark:bg-dark-200 justify-center items-center"
+      >
+        <Text className="text-lg">⚙️</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -1753,15 +1814,89 @@ const NovelDetails = () => {
     if (selectedItems.size === 0) return;
     setShowActionModal(true);
   };
+
   const handlePublishProject = async () => {
     try {
+      if (!isAuthenticated()) {
+        Alert.alert(
+          "Login Required",
+          "You must be logged in to publish projects. Please login first.",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
       if (!project) return;
 
-      // Get front cover image if available
-      const frontCover = covers.find((c) => c.cover_type === "front");
-      const coverImage = frontCover?.image_uri;
+      setPublishingStatus("publishing");
 
-      // Prepare project data for publishing
+      // Get all items to publish
+      const allItems = getItemsByProject(projectId) as ItemNode[];
+
+      // Filter only chapters/documents, exclude folders and other item types
+      const itemsToPublish = allItems
+        // @ts-ignore
+        .filter((item) => item.is_included_in_export !== 0)
+        .filter(
+          (item) =>
+            item.item_type === "document" || item.item_type === "chapter"
+        )
+        .map((item) => ({
+          parentItemId: item.parent_item_id
+            ? item.parent_item_id.toString()
+            : "",
+          itemType: item.item_type,
+          name: item.name,
+          description: item.name,
+          content: item.content,
+          metadata: item.metadata,
+          orderIndex: item.order_index,
+          depthLevel: item.depth_level,
+          wordCount: item.word_count,
+        }));
+
+      // Convert local image URIs to base64 for both covers
+      let frontCoverBase64 = null;
+      let backCoverBase64 = null;
+
+      const frontCover = covers.find((c) => c.cover_type === "front");
+      const backCover = covers.find((c) => c.cover_type === "back");
+
+      // Convert front cover to base64 if it exists
+      if (frontCover?.image_uri && frontCover.image_uri.startsWith("file://")) {
+        try {
+          frontCoverBase64 = await convertImageToBase64(frontCover.image_uri);
+        } catch (error) {
+          Alert.alert("Error", "Failed to process front cover image");
+          setPublishingStatus("idle");
+          return;
+        }
+      } else if (
+        frontCover?.image_uri &&
+        frontCover.image_uri.startsWith("data:")
+      ) {
+        // If it's already base64, use it directly
+        frontCoverBase64 = frontCover.image_uri;
+      }
+
+      // Convert back cover to base64 if it exists
+      if (backCover?.image_uri && backCover.image_uri.startsWith("file://")) {
+        try {
+          backCoverBase64 = await convertImageToBase64(backCover.image_uri);
+        } catch (error) {
+          console.error("Failed to convert back cover to base64:", error);
+          Alert.alert("Error", "Failed to process back cover image");
+          setPublishingStatus("idle");
+          return;
+        }
+      } else if (
+        backCover?.image_uri &&
+        backCover.image_uri.startsWith("data:")
+      ) {
+        // If it's already base64, use it directly
+        backCoverBase64 = backCover.image_uri;
+      }
+
       const projectData = {
         localProjectId: projectId,
         type: project.type || "novel",
@@ -1769,18 +1904,34 @@ const NovelDetails = () => {
         description: project.description,
         genre: project.genre,
         authorName: project.author_name,
-        coverImage: coverImage,
-        wordCount: stats?.wordCount || 0,
-        items: items, // Your project items
-        settings: publishingSettings, // Your publishing settings
+        coverImage: frontCoverBase64,
+        backImage: backCoverBase64, // Correct parameter name for backend
+        wordCount: project?.word_count || stats?.wordCount || 0,
+        items: itemsToPublish,
+        settings: publishingSettings,
       };
 
-      // Call your existing publishProject function from api.ts
       const result = await publishProject(projectData);
 
-      Alert.alert("Success", "Project published successfully!");
+      if (result && result.success && result.projectId) {
+        loadProjectData();
+        setPublishingStatus("idle");
+
+        Alert.alert(
+          "Published Successfully! 🎉",
+          `Your ${project.type} "${project.title}" is now live!`,
+          [{ text: "OK" }]
+        );
+      } else {
+        throw new Error("Invalid response from server - missing project ID");
+      }
     } catch (error: any) {
-      Alert.alert("Publish Failed", error.message);
+      setPublishingStatus("idle");
+      console.error("Publish error details:", error);
+      Alert.alert(
+        "Publish Failed",
+        error.message || "Failed to publish project"
+      );
     }
   };
 
@@ -2238,14 +2389,35 @@ const NovelDetails = () => {
                     </View>
                   )}
 
-                  <TouchableOpacity
-                    onPress={handlePublishProject}
-                    className="bg-green-400 px-4 py-4 mt-4 rounded-full shadow-lg"
-                  >
-                    <Text className="text-sm font-bold text-white">
-                      📤 Publish
-                    </Text>
-                  </TouchableOpacity>
+                  {/* <View className="flex-row gap-3 mt-4">
+                    {project.status === "complete" && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (!isAuthenticated()) {
+                            Alert.alert(
+                              "Login Required",
+                              "You must be logged in to publish projects. Please login first.",
+                              [{ text: "OK" }]
+                            );
+                            return;
+                          }
+                          setShowPublishModal(true);
+                        }}
+                        disabled={publishingStatus !== "idle"}
+                        className={`flex-1 px-4 py-4 rounded-full shadow-lg ${
+                          publishingStatus !== "idle"
+                            ? "bg-gray-400"
+                            : "bg-green-500"
+                        }`}
+                      >
+                        <Text className="text-sm font-bold text-white text-center">
+                          {publishingStatus === "publishing"
+                            ? "⏳ Publishing..."
+                            : "Publish Project"}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View> */}
                 </View>
               )}
             </Animated.View>
@@ -2799,7 +2971,7 @@ const NovelDetails = () => {
                   </View>
                 )}
 
-                {autoSaveEnabled && (
+                {!isFocusMode && autoSaveEnabled && (
                   <View className="mt-2">
                     <Text className="text-xs text-gray-500 dark:text-light-200 text-center">
                       ✓ Auto-save enabled
@@ -2868,7 +3040,7 @@ const NovelDetails = () => {
 
               {editingItem?.item_type === "document" && (
                 <View className="flex-1">
-                  {!isFocusMode && !zenMode && (
+                  {!zenMode && (
                     <RichToolbar
                       editor={editorRef}
                       actions={[
@@ -2950,6 +3122,7 @@ const NovelDetails = () => {
                       }}
                     >
                       <RichEditor
+                        key={`editor-${writingSettings.fontSize}-${writingSettings.fontFamily}-${writingSettings.lineHeight}-${writingSettings.textColor}-${writingSettings.backgroundColor}-${zenMode}`}
                         ref={editorRef}
                         initialContentHTML={editingItem?.content || ""}
                         onChange={(html) => {
@@ -2964,15 +3137,18 @@ const NovelDetails = () => {
                         editorStyle={{
                           backgroundColor: writingSettings.backgroundColor,
                           color: writingSettings.textColor,
-                          // @ts-ignore
-                          fontSize: writingSettings.fontSize,
-                          lineHeight: writingSettings.lineHeight,
-                          fontFamily:
-                            writingSettings.fontFamily === "System"
-                              ? undefined
-                              : writingSettings.fontFamily,
-                          padding: zenMode ? 40 : 16,
-                          textAlign: writingSettings.textAlign || "left",
+                          caretColor: writingSettings.textColor,
+                          contentCSSText: `
+      font-size: ${writingSettings.fontSize}px;
+      line-height: ${writingSettings.lineHeight};
+      font-family: ${
+        writingSettings.fontFamily === "System"
+          ? "system-ui, -apple-system, sans-serif"
+          : writingSettings.fontFamily
+      };
+      padding: ${zenMode ? 40 : 16}px;
+      text-align: ${writingSettings.textAlign || "left"};
+    `,
                         }}
                         useContainer={true}
                       />
@@ -3021,11 +3197,17 @@ const NovelDetails = () => {
             </Text>
 
             <View className="flex-row gap-4 mb-6">
+              {/* Front Cover */}
               <TouchableOpacity
                 onPress={() => handlePickCover("front")}
+                disabled={isUploadingFrontCover}
                 className="flex-1 bg-light-100 dark:bg-dark-100 rounded-2xl p-4 items-center"
               >
-                {frontCover ? (
+                {isUploadingFrontCover ? (
+                  <View className="w-full h-48 bg-gray-200 dark:bg-dark-300 rounded-xl justify-center items-center mb-3">
+                    <ActivityIndicator size="large" color="#6B46C1" />
+                  </View>
+                ) : frontCover ? (
                   <Image
                     source={{ uri: frontCover.image_uri }}
                     className="w-full h-48 rounded-xl mb-3"
@@ -3039,15 +3221,26 @@ const NovelDetails = () => {
                   </View>
                 )}
                 <Text className="text-sm font-bold text-primary">
-                  {frontCover ? "Change" : "Add"} Front
+                  {isUploadingFrontCover
+                    ? "Uploading..."
+                    : frontCover
+                    ? "Change"
+                    : "Add"}{" "}
+                  Front
                 </Text>
               </TouchableOpacity>
 
+              {/* Back Cover */}
               <TouchableOpacity
                 onPress={() => handlePickCover("back")}
+                disabled={isUploadingBackCover}
                 className="flex-1 bg-light-100 dark:bg-dark-100 rounded-2xl p-4 items-center"
               >
-                {backCover ? (
+                {isUploadingBackCover ? (
+                  <View className="w-full h-48 bg-gray-200 dark:bg-dark-300 rounded-xl justify-center items-center mb-3">
+                    <ActivityIndicator size="large" color="#6B46C1" />
+                  </View>
+                ) : backCover ? (
                   <Image
                     source={{ uri: backCover.image_uri }}
                     className="w-full h-48 rounded-xl mb-3"
@@ -3061,7 +3254,12 @@ const NovelDetails = () => {
                   </View>
                 )}
                 <Text className="text-sm font-bold text-primary">
-                  {backCover ? "Change" : "Add"} Back
+                  {isUploadingBackCover
+                    ? "Uploading..."
+                    : backCover
+                    ? "Change"
+                    : "Add"}{" "}
+                  Back
                 </Text>
               </TouchableOpacity>
             </View>
@@ -3192,6 +3390,83 @@ const NovelDetails = () => {
                 Page {currentPage + 1} of{" "}
                 {(frontCover ? 1 : 0) + allDocs.length + (backCover ? 1 : 0)}
               </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showPublishModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPublishModal(false)}
+      >
+        <View className="flex-1 bg-black/80 justify-center items-center px-6">
+          <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md">
+            <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-4 text-center">
+              Publish Your Work 🚀
+            </Text>
+
+            <View className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-4">
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-sm text-gray-600 dark:text-light-200">
+                  Title:
+                </Text>
+                <Text className="text-sm font-bold text-gray-900 dark:text-light-100">
+                  {project?.title}
+                </Text>
+              </View>
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-sm text-gray-600 dark:text-light-200">
+                  Type:
+                </Text>
+                <Text className="text-sm font-bold text-gray-900 dark:text-light-100 capitalize">
+                  {project?.type}
+                </Text>
+              </View>
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-sm text-gray-600 dark:text-light-200">
+                  Words:
+                </Text>
+                <Text className="text-sm font-bold text-gray-900 dark:text-light-100">
+                  {stats?.wordCount?.toLocaleString() || 0}
+                </Text>
+              </View>
+              <View className="flex-row items-center justify-between">
+                <Text className="text-sm text-gray-600 dark:text-light-200">
+                  Items:
+                </Text>
+                <Text className="text-sm font-bold text-gray-900 dark:text-light-100">
+                  {items.length}
+                </Text>
+              </View>
+            </View>
+
+            <Text className="text-sm text-gray-600 dark:text-light-200 mb-4 text-center">
+              Your work will be published and accessible to readers. You can
+              unpublish or update it anytime.
+            </Text>
+
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => setShowPublishModal(false)}
+                className="flex-1 bg-light-100 dark:bg-dark-100 py-4 rounded-full"
+              >
+                <Text className="text-gray-600 dark:text-light-200 font-bold text-center">
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowPublishModal(false);
+                  handlePublishProject();
+                }}
+                className="flex-1 bg-green-500 py-4 rounded-full"
+              >
+                <Text className="text-white font-bold text-center">
+                  Publish Now
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>

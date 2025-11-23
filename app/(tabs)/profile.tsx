@@ -1,16 +1,14 @@
 import Background from "@/components/common/Background";
+import { clearAuth, updateUserProfile } from "@/utils/api";
 import {
   getAllProjects,
   getCurrentUser,
   getSetting,
   getStats,
-  updateUserProfile,
   updateDailyGoal,
   clearActiveSession,
 } from "@/utils/database";
 
-// Remove this line
-import { syncUserProfile } from "@/utils/syncHelper";
 // @ts-ignore
 import * as ImagePicker from "expo-image-picker";
 // @ts-ignore
@@ -42,17 +40,20 @@ const Profile = () => {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [showGoalEditor, setShowGoalEditor] = useState(false);
   const [tempGoal, setTempGoal] = useState("");
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadData();
     loadSettings();
   }, []);
 
-  const loadData = () => {
+  const loadData = async () => {
+    setLoading(true);
     try {
-      const currentUser = getCurrentUser();
+      const currentUser = await getCurrentUser();
+
       setUser(currentUser);
+      console.log(user, "***************");
 
       const statsData = getStats();
       const projectsData = getAllProjects();
@@ -61,13 +62,19 @@ const Profile = () => {
 
       if (currentUser) {
         setEditForm({
-          displayName: currentUser.displayName || "",
+          displayName: currentUser.display_name || "",
           email: currentUser.email || "",
           bio: currentUser.bio || "",
         });
+      } else {
+        console.log("⚠️ No user data available for profile");
       }
     } catch (error) {
-      console.error("Error loading data:", error);
+      console.error("❌ Error loading profile data:", error);
+
+      setUser(null);
+    } finally {
+      setLoading(true);
     }
   };
 
@@ -89,37 +96,35 @@ const Profile = () => {
     }
   };
 
- const handleUpdateProfile = async () => {
-  if (!user) return;
+  const handleUpdateProfile = async () => {
+    if (!user) return;
 
-  setLoading(true);
-  try {
-    const result = await syncUserProfile({
-      displayName: editForm.displayName.trim(),
-      email: editForm.email.trim(),
-      bio: editForm.bio.trim(),
-    });
+    setLoading(true);
+    try {
+      await updateUserProfile({
+        displayName: editForm.displayName.trim(),
+        email: editForm.email.trim() || "guestuser@quilkalam.com",
+        bio: editForm.bio.trim(),
+      });
 
-    if (result.synced) {
-      Alert.alert("Success", "Profile updated and synced to cloud!");
-    } else if (result.local) {
-      Alert.alert(
-        "Saved Locally",
-        "Profile saved locally. Will sync when you're online."
-      );
+      Alert.alert("Success", "Profile updated successfully!");
+
+      // Refresh user data
+      loadData();
+      setIsEditingProfile(false);
+    } catch (error: any) {
+      Alert.alert("Failed to update profile");
+    } finally {
+      setLoading(false);
     }
-
-    // Refresh user data
-    setUser(getCurrentUser());
-    setIsEditingProfile(false);
-  } catch (error: any) {
-    Alert.alert("Error", error.message);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handlePickImage = async () => {
+    if (!user) {
+      Alert.alert("Error", "Please login to update profile picture");
+      return;
+    }
+
     try {
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -137,22 +142,27 @@ const Profile = () => {
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
+        base64: true,
       });
 
-      if (!result.canceled && user && result.assets[0].uri) {
+      if (!result.canceled && result.assets[0].uri) {
         setIsUploadingImage(true);
 
-        // Update profile with new image URI
-        updateUserProfile(user.id, {
-          profileImageUri: result.assets[0].uri,
-        });
+        try {
+          await updateUserProfile({
+            profileImage: `data:image/jpeg;base64,${result.assets[0].base64}`,
+          });
 
-        // Reload user data to show updated image
-        setTimeout(() => {
-          loadData();
-          setIsUploadingImage(false);
+          await loadData();
           Alert.alert("Success", "Profile picture updated!");
-        }, 500);
+        } catch (error: any) {
+          Alert.alert(
+            "Error",
+            error.message || "Failed to update profile picture"
+          );
+        } finally {
+          setIsUploadingImage(false);
+        }
       }
     } catch (error) {
       setIsUploadingImage(false);
@@ -235,14 +245,17 @@ const Profile = () => {
     return projects.filter((p) => p.is_published === 1);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Logout",
         style: "destructive",
-        onPress: () => {
+        onPress: async () => {
           try {
+            // Clear API authentication
+            await clearAuth();
+
             // Clear active session from database
             clearActiveSession();
 
@@ -267,6 +280,15 @@ const Profile = () => {
   const longestProject = getLongestProject();
   const publishedCount = getPublishedProjects().length;
 
+  if (loading) {
+    <Background>
+      <View className="absolute inset-0 justify-center items-center bg-white text-black dark:bg-black dark:text-white">
+        <ActivityIndicator />
+        <Text className="text-black dark:text-white text-4xl">Loading...</Text>
+      </View>
+    </Background>;
+  }
+
   return (
     <Background>
       <ScrollView
@@ -280,16 +302,13 @@ const Profile = () => {
             <Text className="text-3xl font-bold text-gray-900 dark:text-light-100 mb-1">
               Profile
             </Text>
-            <Text className="text-sm text-gray-600 dark:text-light-200">
-              Your writing journey
-            </Text>
           </View>
           {user && (
             <TouchableOpacity
               onPress={handleLogout}
-              className="px-4 py-2 bg-red-500/10 rounded-full"
+              className="px-4 py-2 bg-red-100 dark:bg-red-400 rounded-full"
             >
-              <Text className="text-red-600 dark:text-red-400 font-semibold text-sm">
+              <Text className=" dark:text-white font-semibold text-sm">
                 Logout
               </Text>
             </TouchableOpacity>
@@ -298,7 +317,7 @@ const Profile = () => {
 
         {/* User Info Card */}
         <View className="px-6 mb-6">
-          <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 shadow-lg">
+          <View className="bg-white dark:bg-transparent rounded-3xl p-4  shadow-lg">
             <View className="items-center mb-4">
               {user && (
                 <TouchableOpacity
@@ -309,9 +328,9 @@ const Profile = () => {
                     <View className="w-24 h-24 rounded-full bg-light-100 dark:bg-dark-100 justify-center items-center mb-4">
                       <ActivityIndicator size="large" color="#6B46C1" />
                     </View>
-                  ) : user?.profileImage ? (
+                  ) : user?.profile_image_url ? (
                     <Image
-                      source={{ uri: user.profileImage }}
+                      source={{ uri: user.profile_image_url }}
                       className="w-24 h-24 rounded-full mb-4"
                     />
                   ) : (
@@ -390,7 +409,7 @@ const Profile = () => {
                       className="flex-row items-center gap-2"
                     >
                       <Text className="text-2xl font-bold text-gray-900 dark:text-light-100">
-                        {user?.displayName || "Guest Writer"}
+                        {user?.display_name || "Guest Writer"}
                       </Text>
                       <Text className="text-gray-400 dark:text-light-200">
                         ✏️
@@ -401,9 +420,9 @@ const Profile = () => {
                         {user.email}
                       </Text>
                     )}
-                    {user?.phoneNumber && (
+                    {user?.phone_number && (
                       <Text className="text-xs text-gray-500 dark:text-light-200 mt-1">
-                        📱 {user.phoneNumber}
+                        📱 {user.phone_number}
                       </Text>
                     )}
                     {user?.bio ? (
@@ -554,19 +573,19 @@ const Profile = () => {
             <Text className="text-xl font-bold text-gray-900 dark:text-light-100 mb-3">
               Achievements
             </Text>
-            <View className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-3xl p-6 shadow-lg">
+            <View className="bg-amber-200 dark:bg-gray-600 rounded-3xl p-6 dark:shadow-lg">
               <View className="flex-row items-center gap-3 mb-3">
                 <Text className="text-4xl">🏆</Text>
                 <View className="flex-1">
-                  <Text className="text-sm text-white/80 mb-1">
+                  <Text className="text-sm text-black dark:text-white/80 mb-1">
                     Longest Project
                   </Text>
-                  <Text className="text-xl font-bold text-white">
+                  <Text className="text-xl font-bold dark:text-white">
                     {longestProject.title}
                   </Text>
                 </View>
               </View>
-              <Text className="text-3xl font-bold text-white">
+              <Text className="text-3xl font-bold dark:text-white">
                 {(longestProject.word_count || 0).toLocaleString()} words
               </Text>
             </View>
@@ -627,7 +646,7 @@ const Profile = () => {
             Actions
           </Text>
           <View className="gap-3">
-            <TouchableOpacity className="bg-white dark:bg-dark-200 rounded-2xl p-4 shadow-lg flex-row items-center justify-between">
+            {/* <TouchableOpacity className="bg-white dark:bg-dark-200 rounded-2xl p-4 shadow-lg flex-row items-center justify-between">
               <View className="flex-row items-center gap-3">
                 <View className="w-10 h-10 rounded-xl bg-primary/10 justify-center items-center">
                   <Text className="text-xl">⚙️</Text>
@@ -637,9 +656,9 @@ const Profile = () => {
                 </Text>
               </View>
               <Text className="text-gray-400 dark:text-light-200">›</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
 
-            <TouchableOpacity className="bg-white dark:bg-dark-200 rounded-2xl p-4 shadow-lg flex-row items-center justify-between">
+            {/* <TouchableOpacity className="bg-white dark:bg-dark-200 rounded-2xl p-4 shadow-lg flex-row items-center justify-between">
               <View className="flex-row items-center gap-3">
                 <View className="w-10 h-10 rounded-xl bg-green-500/10 justify-center items-center">
                   <Text className="text-xl">📤</Text>
@@ -649,9 +668,9 @@ const Profile = () => {
                 </Text>
               </View>
               <Text className="text-gray-400 dark:text-light-200">›</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
 
-            <TouchableOpacity className="bg-white dark:bg-dark-200 rounded-2xl p-4 shadow-lg flex-row items-center justify-between">
+            {/* <TouchableOpacity className="bg-white dark:bg-dark-200 rounded-2xl p-4 shadow-lg flex-row items-center justify-between">
               <View className="flex-row items-center gap-3">
                 <View className="w-10 h-10 rounded-xl bg-blue-500/10 justify-center items-center">
                   <Text className="text-xl">📥</Text>
@@ -661,7 +680,7 @@ const Profile = () => {
                 </Text>
               </View>
               <Text className="text-gray-400 dark:text-light-200">›</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
 
             <TouchableOpacity
               onPress={() =>
@@ -691,17 +710,18 @@ const Profile = () => {
           <View className="px-6 mb-11">
             <View className="bg-primary/10 rounded-3xl p-6 border-2 border-primary/20">
               <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-2">
-                Create a local account
+                Sign in to save your profile
               </Text>
               <Text className="text-sm text-gray-600 dark:text-light-200 mb-4">
-                Create a local account to save your profile and settings.
+                Create an account to sync your profile, settings, and published
+                works across devices.
               </Text>
               <TouchableOpacity
                 onPress={() => router.push("/login")}
                 className="bg-primary py-3 rounded-xl"
               >
                 <Text className="text-white font-bold text-center">
-                  Create Account
+                  Sign In / Register
                 </Text>
               </TouchableOpacity>
             </View>
