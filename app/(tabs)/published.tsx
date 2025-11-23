@@ -237,7 +237,7 @@ const PublishedWorks = () => {
         <View className="flex-1 justify-center items-center">
           {/* <ActivityIndicator size="large" color="#FF6B9D" /> */}
           <Text className="text-gray-600 dark:text-light-200 mt-4">
-            These is an upcoming feature 😩
+            This is an upcoming feature 😩
           </Text>
         </View>
       </Background>
