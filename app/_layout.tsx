@@ -3,6 +3,7 @@ import { Stack, useRouter } from "expo-router";
 import { initializeApp } from "@/utils/appInitializer";
 import { ActivityIndicator, View } from "react-native";
 import { Text } from "@react-navigation/elements";
+import GlobalAlert from "@/components/common/GlobalAlert";
 import "./global.css";
 
 export default function RootLayout() {
@@ -31,6 +32,8 @@ export default function RootLayout() {
         <Stack.Screen name="login" />
         <Stack.Screen name="novel/[id]" />
       </Stack>
+
+      <GlobalAlert />
 
       {loading && (
         <View className="absolute inset-0 justify-center items-center bg-white text-black dark:bg-black dark:text-white">

@@ -2513,3 +2513,193 @@ export const setWritingSetting = (data: {
     throw error;
   }
 };
+
+
+// ==================== LOCAL DATA EXPORT/IMPORT ====================
+
+export const exportAllDataAsJSON = async () => {
+  try {
+    const allProjects = getAllProjects();
+    const exportData: any = {
+      version: "1.0",
+      exportDate: Date.now(),
+      settings: {},
+      projects: []
+    };
+
+    // Export app settings
+    const settingsKeys = ['daily_goal', 'user_display_name', 'user_email', 'user_phone_number', 'active_user_id'];
+    settingsKeys.forEach(key => {
+      const value = getSetting(key);
+      if (value) {
+        exportData.settings[key] = value;
+      }
+    });
+
+    // Export each project with all related data
+    for (const project of allProjects as any[]) {
+      const projectData = {
+        project: project,
+        items: getItemsByProject(project.id),
+        covers: getProjectCovers(project.id),
+        contentPage: getContentPage(project.id),
+        publishingSettings: getPublishingSettings(project.id),
+        templateStages: getTemplateStages(project.id),
+        writingSettings: getWritingSettings(project.id),
+        formattingStyles: getFormatting(project.id),
+        // Legacy data for compatibility
+        folders: getFoldersByProject(project.id),
+        files: getFilesByProject(project.id),
+        characters: getCharactersByProject(project.id),
+        locations: getLocationsByProject(project.id)
+      };
+      exportData.projects.push(projectData);
+    }
+
+    return JSON.stringify(exportData, null, 2);
+  } catch (error) {
+    console.error("Error exporting all data:", error);
+    throw error;
+  }
+};
+
+export const importAllDataFromJSON = async (jsonData: string) => {
+  try {
+    const data = JSON.parse(jsonData);
+    
+    // Import app settings
+    if (data.settings) {
+      Object.keys(data.settings).forEach(key => {
+        setSetting(key, data.settings[key]);
+      });
+    }
+
+    // Import projects
+    const importedProjectIds: number[] = [];
+    
+    for (const projectData of data.projects) {
+      // Create project
+      const projectId = createProject({
+        type: projectData.project.type,
+        title: projectData.project.title,
+        description: projectData.project.description,
+        genre: projectData.project.genre,
+        authorName: projectData.project.author_name,
+        writingTemplate: projectData.project.writing_template,
+        targetWordCount: projectData.project.target_word_count
+      });
+
+      // Update project status
+      if (projectData.project.status) {
+        updateProject(projectId, { status: projectData.project.status });
+      }
+
+      // Import covers
+      if (projectData.covers) {
+        projectData.covers.forEach((cover: any) => {
+          setProjectCover(
+            projectId,
+            cover.cover_type,
+            cover.image_uri,
+            cover.image_width,
+            cover.image_height
+          );
+        });
+      }
+
+      // Import items
+      if (projectData.items && projectData.items.length > 0) {
+        const itemMap = new Map();
+        
+        // Sort items by depth level to handle parent-child relationships
+        const sortedItems = [...projectData.items].sort((a: any, b: any) => 
+          (a.depth_level || 0) - (b.depth_level || 0)
+        );
+
+        sortedItems.forEach((item: any) => {
+          const newItemId = createItem({
+            projectId,
+            parentItemId: item.parent_item_id ? itemMap.get(item.parent_item_id) : undefined,
+            itemType: item.item_type,
+            name: item.name,
+            description: item.description,
+            content: item.content,
+            metadata: item.metadata ? JSON.parse(item.metadata) : undefined,
+            orderIndex: item.order_index,
+            color: item.color,
+            icon: item.icon
+          });
+          itemMap.set(item.id, newItemId);
+        });
+      }
+
+      // Import publishing settings
+      if (projectData.publishingSettings) {
+        setPublishingSettings(projectId, {
+          isbn: projectData.publishingSettings.isbn,
+          publisher: projectData.publishingSettings.publisher,
+          publicationDate: projectData.publishingSettings.publication_date,
+          price: projectData.publishingSettings.price,
+          language: projectData.publishingSettings.language,
+          copyrightText: projectData.publishingSettings.copyright_text,
+          dedication: projectData.publishingSettings.dedication,
+          acknowledgments: projectData.publishingSettings.acknowledgments,
+          exportFormat: projectData.publishingSettings.export_format
+        });
+      }
+
+      // Import writing settings
+      if (projectData.writingSettings) {
+        setWritingSetting({
+          projectId,
+          fontFamily: projectData.writingSettings.font_family,
+          fontSize: projectData.writingSettings.font_size,
+          lineHeight: projectData.writingSettings.line_height,
+          textColor: projectData.writingSettings.text_color,
+          backgroundColor: projectData.writingSettings.background_color,
+          paragraphSpacing: projectData.writingSettings.paragraph_spacing,
+          textAlign: projectData.writingSettings.text_align,
+          pageWidth: projectData.writingSettings.page_width,
+          marginTop: projectData.writingSettings.margin_top,
+          marginBottom: projectData.writingSettings.margin_bottom,
+          typewriterMode: projectData.writingSettings.typewriter_mode === 1,
+          autoSave: projectData.writingSettings.auto_save === 1,
+          zenMode: projectData.writingSettings.zen_mode === 1
+        });
+      }
+
+      // Import template stages
+      if (projectData.templateStages) {
+        projectData.templateStages.forEach((stage: any) => {
+          const now = Date.now();
+          db.runSync(
+            `INSERT INTO template_stages (
+              project_id, template_type, stage_name, stage_description, 
+              order_index, is_completed, notes, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            projectId,
+            stage.template_type,
+            stage.stage_name,
+            stage.stage_description,
+            stage.order_index,
+            stage.is_completed,
+            stage.notes,
+            now,
+            now
+          );
+        });
+      }
+
+      importedProjectIds.push(projectId);
+    }
+
+    return {
+      success: true,
+      projectsImported: importedProjectIds.length,
+      projectIds: importedProjectIds
+    };
+  } catch (error) {
+    console.error("Error importing data:", error);
+    throw error;
+  }
+};

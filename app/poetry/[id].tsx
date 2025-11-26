@@ -1,11 +1,12 @@
 import Background from "@/components/common/Background";
+import GlobalAlert from "@/components/common/GlobalAlert";
+import KeyboardAvoidingLayout from "@/components/common/KeyboardAvoidingLayout";
 import {
   colorThemes,
   poetryForms,
   prompts,
   writingThemes,
 } from "@/constants/poetryDetails";
-
 
 import {
   createFile,
@@ -39,6 +40,7 @@ import {
   View,
   Vibration,
   Share,
+  FlatList,
 } from "react-native";
 
 const { width, height } = Dimensions.get("window");
@@ -487,6 +489,15 @@ const PoetryDetails = () => {
     message: string;
   } | null>(null);
 
+  const [showPoemSearchModal, setShowPoemSearchModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedPoem, setSelectedPoem] = useState<any>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchType, setSearchType] = useState<"title" | "author" | "both">(
+    "both"
+  );
+
   // Animation Refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const headerHeight = useRef(new Animated.Value(1)).current;
@@ -548,6 +559,13 @@ const PoetryDetails = () => {
   useEffect(() => {
     setFoundRhymes(rhymeWord.trim() ? findRhymes(rhymeWord.trim()) : []);
   }, [rhymeWord]);
+
+  // Add this useEffect to trigger search when type changes
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      searchPoems(searchQuery);
+    }
+  }, [searchType]);
 
   // Add this useEffect after your other useEffects
   useEffect(() => {
@@ -619,6 +637,67 @@ const PoetryDetails = () => {
     }
   };
 
+  const searchPoems = async (query: string) => {
+    if (!query.trim()) return;
+    setIsSearching(true);
+    try {
+      const cleanQuery = query.trim().replace(/\s+/g, "%20");
+
+      // Define search URLs based on selected type
+      let searchUrls: string[] = [];
+
+      switch (searchType) {
+        case "title":
+          searchUrls = [
+            `https://poetrydb.org/title/${cleanQuery}`,
+            `https://poetrydb.org/author,title/${cleanQuery}`, // Fallback
+          ];
+          break;
+        case "author":
+          searchUrls = [
+            `https://poetrydb.org/author/${cleanQuery}`,
+            `https://poetrydb.org/author,title/${cleanQuery}`, // Fallback
+          ];
+          break;
+        case "both":
+        default:
+          searchUrls = [
+            `https://poetrydb.org/author,title/${cleanQuery}`,
+            `https://poetrydb.org/title/${cleanQuery}`, // Fallback
+            `https://poetrydb.org/author/${cleanQuery}`, // Fallback
+          ];
+      }
+
+      let results: any[] = [];
+
+      // Try endpoints in order (primary first, then fallbacks)
+      for (const url of searchUrls) {
+        try {
+          console.log(`Trying URL: ${url}`); // Debug log
+          const response = await fetch(url);
+          if (!response.ok) continue;
+
+          const data = await response.json();
+          if (Array.isArray(data) && data.length > 0) {
+            results = data;
+            console.log(`Found ${data.length} results from ${url}`); // Debug log
+            break; // Stop at first successful result
+          }
+        } catch (e) {
+          console.log(`Search failed for ${url}`, e);
+          continue;
+        }
+      }
+
+      setSearchResults(results);
+    } catch (error) {
+      console.error("Search error:", error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const toggleHeaderMinimize = () => {
     setIsHeaderMinimized(!isHeaderMinimized);
     Animated.timing(headerHeight, {
@@ -630,7 +709,11 @@ const PoetryDetails = () => {
 
   const handleAddPoem = () => {
     if (!newPoemTitle.trim()) {
-      Alert.alert("Error", "Please enter a title");
+      GlobalAlert.show({
+        title: "Error",
+        message: "Please enter a title",
+        primaryText: "Cancel",
+      });
       return;
     }
     try {
@@ -649,9 +732,18 @@ const PoetryDetails = () => {
       setSelectedMood(null);
       loadProjectData();
       Vibration.vibrate(50);
-      Alert.alert("✨ Poem Created!", "Your new poem has been added.");
+
+      GlobalAlert.show({
+        title: "Poem Created!",
+        message: "Your new poem has been added.",
+        primaryText: "Okay",
+      });
     } catch (e) {
-      Alert.alert("Error", "Failed to create poem");
+      GlobalAlert.show({
+        title: "Error",
+        message: "Failed to create poem",
+        primaryText: "Cancel",
+      });
     }
   };
 
@@ -693,55 +785,66 @@ const PoetryDetails = () => {
       setEditingPoem(null);
       loadProjectData();
       Vibration.vibrate(50);
-      Alert.alert("✨ Saved!", "Your poem has been saved.");
+
+      GlobalAlert.show({
+        title: "Saved!",
+        message: "Your poem has been saved.",
+        primaryText: "Okay",
+      });
     } catch (e) {
-      Alert.alert("Error", "Failed to save");
+      GlobalAlert.show({
+        title: "Error",
+        message: "Failed to save",
+        primaryText: "Cancel",
+      });
     }
   };
 
   const handleDeletePoem = (id: number, title: string) => {
-    Alert.alert("Delete Poem", `Delete "${title}"?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          deleteFile(id);
-          loadProjectData();
-        },
+    GlobalAlert.show({
+      title: "Delete Poem",
+      message: `Delete "${title}"?`,
+      primaryText: "Cancel",
+
+      secondaryText: "Delete",
+      onSecondary: () => {
+        deleteFile(id);
+        loadProjectData();
       },
-    ]);
+    });
   };
 
   const handleDeleteCollection = (id: number, name: string) => {
-    Alert.alert("Delete Collection", `Delete "${name}" and all its poems?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          deleteFolder(id);
-          loadProjectData();
-        },
+    GlobalAlert.show({
+      title: "Delete Collection",
+      message: `Delete "${name}" and all its poems?`,
+      primaryText: "Cancel",
+
+      secondaryText: "Delete",
+      onSecondary: () => {
+        deleteFolder(id);
+        loadProjectData();
       },
-    ]);
+    });
   };
 
   const handleSharePoem = async (poem: any) => {
-  try {
-    let message = `${poem.name}\n${"-".repeat(poem.name.length)}\n\n${poem.content}`;
-    if (project.author_name) {
-      message += `\n\n- ${project.author_name}`;
-    }
+    try {
+      let message = `${poem.name}\n${"-".repeat(poem.name.length)}\n\n${
+        poem.content
+      }`;
+      if (project.author_name) {
+        message += `\n\n- ${project.author_name}`;
+      }
 
-    await Share.share({
-      message: message,
-      title: poem.name,
-    });
-  } catch (err) {
-    console.error("Share error:", err);
-  }
-};
+      await Share.share({
+        message: message,
+        title: poem.name,
+      });
+    } catch (err) {
+      console.error("Share error:", err);
+    }
+  };
 
   const handleUpdateStatus = () => {
     const statuses = [
@@ -802,8 +905,8 @@ const PoetryDetails = () => {
       template === "haiku"
         ? [5, 7, 5]
         : template === "tanka"
-          ? [5, 7, 5, 7, 7]
-          : null;
+        ? [5, 7, 5, 7, 7]
+        : null;
     return (
       <View className="bg-blue-50 dark:bg-dark-100 px-4 py-2 border-b border-blue-100">
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -844,7 +947,7 @@ const PoetryDetails = () => {
     return (
       <Animated.View
         style={{ transform: [{ scale: formValidation.valid ? pulseAnim : 1 }] }}
-        className={`px-3 py-1 rounded-full ${
+        className={`px-3 py-1 mt-2 rounded-full ${
           formValidation.valid ? "bg-green-100" : "bg-orange-100"
         }`}
       >
@@ -908,11 +1011,13 @@ const PoetryDetails = () => {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-  onPress={() => editingPoem && handleSharePoem(editingPoem)}
-  className="bg-indigo-100 px-3 py-2 rounded-full"
->
-  <Text className="text-xs font-bold text-indigo-700">📤 Share</Text>
-</TouchableOpacity>
+              onPress={() => editingPoem && handleSharePoem(editingPoem)}
+              className="bg-indigo-100 px-3 py-2 rounded-full"
+            >
+              <Text className="text-xs font-bold text-indigo-700">
+                📤 Share
+              </Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </View>
@@ -1008,85 +1113,86 @@ const PoetryDetails = () => {
   // ==================== MAIN RETURN ====================
   return (
     <Background>
-      <View className="flex-1">
-        {/* Header */}
-        <Animated.View>
-          <View className="px-6 pt-16">
-            <View className="flex-row justify-between items-center mb-2">
-              {renderHeaderButtons()}
-            </View>
-            {!isHeaderMinimized && (
-              <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 shadow-lg">
-                <View className="flex-row items-start mb-4">
-                  <View className="w-16 h-16 rounded-2xl bg-primary justify-center items-center mr-4">
-                    <Text className="text-4xl">✍🏻</Text>
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-1">
-                      {project.title}
-                    </Text>
-                    {project.author_name && (
-                      <Text className="text-sm text-gray-600 dark:text-light-200 mb-2">
-                        by {project.author_name}
+      <KeyboardAvoidingLayout>
+        <View className="flex-1">
+          {/* Header */}
+          <Animated.View>
+            <View className="px-6 pt-16">
+              <View className="flex-row justify-between items-center mb-2">
+                {renderHeaderButtons()}
+              </View>
+              {!isHeaderMinimized && (
+                <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 shadow-lg">
+                  <View className="flex-row items-start mb-4">
+                    <View className="w-16 h-16 rounded-2xl bg-primary justify-center items-center mr-4">
+                      <Text className="text-4xl">✍🏻</Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-1">
+                        {project.title}
                       </Text>
-                    )}
-                    <View className="flex-row gap-2 flex-wrap">
-                      <TouchableOpacity
-                        onPress={handleUpdateStatus}
-                        className="bg-primary px-3 py-1 rounded-full"
-                      >
-                        <Text className="text-white text-xs font-bold">
-                          {project.status.replace("_", " ").toUpperCase()}
+                      {project.author_name && (
+                        <Text className="text-sm text-gray-600 dark:text-light-200 mb-2">
+                          by {project.author_name}
                         </Text>
-                      </TouchableOpacity>
-                      {project.writing_template && (
-                        <View className="bg-purple-100 dark:bg-dark-100 px-3 py-1 rounded-full">
-                          <Text className="text-purple-700 dark:text-light-200 text-xs font-semibold">
-                            {poetryForms.find(
-                              (f) => f.value === project.writing_template
-                            )?.label || "Free Verse"}
+                      )}
+                      <View className="flex-row gap-2 flex-wrap">
+                        <TouchableOpacity
+                          onPress={handleUpdateStatus}
+                          className="bg-primary px-3 py-1 rounded-full"
+                        >
+                          <Text className="text-white text-xs font-bold">
+                            {project.status.replace("_", " ").toUpperCase()}
                           </Text>
-                        </View>
-                      )}
+                        </TouchableOpacity>
+                        {project.writing_template && (
+                          <View className="bg-purple-100 dark:bg-dark-100 px-3 py-1 rounded-full">
+                            <Text className="text-purple-700 dark:text-light-200 text-xs font-semibold">
+                              {poetryForms.find(
+                                (f) => f.value === project.writing_template
+                              )?.label || "Free Verse"}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
                   </View>
-                </View>
-                <View className="flex-row gap-3 mb-4">
-                  <TouchableOpacity
-                    onPress={() => setShowGoalsModal(true)}
-                    className="flex-1 bg-green-50 dark:bg-dark-100 rounded-xl p-3"
-                  >
-                    <Text className="text-xs text-green-600 dark:text-green-300 mb-1">
-                      Today's Poems
-                    </Text>
-                    <View className="flex-row items-center">
-                      <Text className="text-xl font-bold text-green-800 dark:text-light-100">
-                        {poemsToday}/{dailyPoemGoal}
+                  <View className="flex-row gap-3 mb-4">
+                    <TouchableOpacity
+                      onPress={() => setShowGoalsModal(true)}
+                      className="flex-1 bg-green-50 dark:bg-dark-100 rounded-xl p-3"
+                    >
+                      <Text className="text-xs text-green-600 dark:text-green-300 mb-1">
+                        Today's Poems
                       </Text>
-                      {poemsToday >= dailyPoemGoal && (
-                        <Text className="ml-2">🏆</Text>
-                      )}
+                      <View className="flex-row items-center">
+                        <Text className="text-xl font-bold text-green-800 dark:text-light-100">
+                          {poemsToday}/{dailyPoemGoal}
+                        </Text>
+                        {poemsToday >= dailyPoemGoal && (
+                          <Text className="ml-2">🏆</Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                    <View className="flex-1 bg-blue-50 dark:bg-dark-100 rounded-xl p-3">
+                      <Text className="text-xs text-blue-600 dark:text-blue-200 mb-1">
+                        Week's Lines
+                      </Text>
+                      <Text className="text-xl font-bold text-blue-800 dark:text-light-100">
+                        {linesThisWeek}/{weeklyLineGoal}
+                      </Text>
                     </View>
-                  </TouchableOpacity>
-                  <View className="flex-1 bg-blue-50 dark:bg-dark-100 rounded-xl p-3">
-                    <Text className="text-xs text-blue-600 dark:text-blue-200 mb-1">
-                      Week's Lines
-                    </Text>
-                    <Text className="text-xl font-bold text-blue-800 dark:text-light-100">
-                      {linesThisWeek}/{weeklyLineGoal}
-                    </Text>
                   </View>
-                </View>
-                <View className="flex-row gap-3 mb-4">
-                  <View className="flex-1 bg-purple-50 dark:bg-dark-100 rounded-xl p-3">
-                    <Text className="text-xs text-purple-600 dark:text-purple-100 mb-1">
-                      Poems
-                    </Text>
-                    <Text className="text-xl font-bold text-purple-900 dark:text-light-100">
-                      {poems.length}
-                    </Text>
-                  </View>
-                  {/* <View className="flex-1 bg-pink-50 dark:bg-dark-100 rounded-xl p-3">
+                  <View className="flex-row gap-3 mb-4">
+                    <View className="flex-1 bg-purple-50 dark:bg-dark-100 rounded-xl p-3">
+                      <Text className="text-xs text-purple-600 dark:text-purple-100 mb-1">
+                        Poems
+                      </Text>
+                      <Text className="text-xl font-bold text-purple-900 dark:text-light-100">
+                        {poems.length}
+                      </Text>
+                    </View>
+                    {/* <View className="flex-1 bg-pink-50 dark:bg-dark-100 rounded-xl p-3">
                     <Text className="text-xs text-pink-600 dark:text-pink-200 mb-1">
                       Collections
                     </Text>
@@ -1094,1141 +1200,1408 @@ const PoetryDetails = () => {
                       {folders.length}
                     </Text>
                   </View> */}
-                  <View className="flex-1 bg-indigo-50 dark:bg-dark-100 rounded-xl p-3">
-                    <Text className="text-xs text-indigo-600 dark:text-indigo-100 mb-1">
-                      Lines
-                    </Text>
-                    <Text className="text-xl font-bold text-indigo-900 dark:text-light-100">
-                      {poems.reduce(
-                        (sum, p) => sum + countLines(p.content || ""),
-                        0
-                      )}
-                    </Text>
-                  </View>
-                </View>
-                {project.target_word_count > 0 && (
-                  <View>
-                    <View className="flex-row justify-between mb-2">
-                      <Text className="text-sm font-semibold text-gray-700 dark:text-light-100">
-                        Progress: {progress.toFixed(1)}%
+                    <View className="flex-1 bg-indigo-50 dark:bg-dark-100 rounded-xl p-3">
+                      <Text className="text-xs text-indigo-600 dark:text-indigo-100 mb-1">
+                        Lines
                       </Text>
-                      <Text className="text-sm text-gray-600 dark:text-light-200">
-                        {totalWordCount.toLocaleString()} /{" "}
-                        {project.target_word_count.toLocaleString()} words
+                      <Text className="text-xl font-bold text-indigo-900 dark:text-light-100">
+                        {poems.reduce(
+                          (sum, p) => sum + countLines(p.content || ""),
+                          0
+                        )}
                       </Text>
                     </View>
-                    <View className="h-3 bg-light-100 dark:bg-dark-100 rounded-full overflow-hidden">
-                      <View
-                        className="h-full bg-primary rounded-full"
-                        style={{ width: `${Math.min(progress, 100)}%` }}
-                      />
-                    </View>
                   </View>
-                )}
-                <View className="flex-row gap-3 mb-1 mt-4">
-                  <TouchableOpacity
-                    onPress={() => setShowAddModal(true)}
-                    className="flex-1 bg-secondary py-4 rounded-2xl shadow-lg"
-                  >
-                    <Text className="text-gray-900 font-bold text-center">
-                      New Poem
-                    </Text>
-                  </TouchableOpacity>
-                  {/* <TouchableOpacity
+                  {project.target_word_count > 0 && (
+                    <View>
+                      <View className="flex-row justify-between mb-2">
+                        <Text className="text-sm font-semibold text-gray-700 dark:text-light-100">
+                          Progress: {progress.toFixed(1)}%
+                        </Text>
+                        <Text className="text-sm text-gray-600 dark:text-light-200">
+                          {totalWordCount.toLocaleString()} /{" "}
+                          {project.target_word_count.toLocaleString()} words
+                        </Text>
+                      </View>
+                      <View className="h-3 bg-light-100 dark:bg-dark-100 rounded-full overflow-hidden">
+                        <View
+                          className="h-full bg-primary rounded-full"
+                          style={{ width: `${Math.min(progress, 100)}%` }}
+                        />
+                      </View>
+                    </View>
+                  )}
+                  <View className="flex-row gap-3 mb-1 mt-4">
+                    <TouchableOpacity
+                      onPress={() => setShowAddModal(true)}
+                      className="flex-1 bg-secondary py-4 rounded-2xl shadow-lg"
+                    >
+                      <Text className="text-gray-900 font-bold text-center">
+                        New Poem
+                      </Text>
+                    </TouchableOpacity>
+                    {/* <TouchableOpacity
                 onPress={handleAddCollection}
                 className="bg-white dark:bg-dark-200 py-4 px-5 rounded-2xl border-2 border-primary"
               >
                 <Text className="text-xl">📚</Text>
               </TouchableOpacity> */}
-                  {/* <TouchableOpacity
+                    {/* <TouchableOpacity
                     onPress={() => setShowExportModal(true)}
                     className="bg-white dark:bg-dark-200 py-4 px-5 rounded-2xl border-2 border-primary"
                   >
                     <Text className="text-xl">📤</Text>
                   </TouchableOpacity> */}
-                </View>
-              </View>
-            )}
-          </View>
-        </Animated.View>
-
-        {/* Content ScrollView */}
-        <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ paddingBottom: 100 }}
-          showsVerticalScrollIndicator={false}
-        >
-          <Animated.View style={{ opacity: fadeAnim }} className="px-6 py-4">
-            {/* Quick Actions */}
-
-            {/* Collections */}
-            {folders.length > 0 && (
-              <View className="mb-6">
-                <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-3">
-                  📚 Collections
-                </Text>
-                {folders.map((collection) => {
-                  const collectionPoems = poems.filter(
-                    (p) => p.folder_id === collection.id
-                  );
-                  return (
-                    <TouchableOpacity
-                      key={collection.id}
-                      onLongPress={() =>
-                        handleDeleteCollection(collection.id, collection.name)
-                      }
-                      className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-3 shadow-sm"
-                    >
-                      <View className="flex-row items-center">
-                        <View className="w-12 h-12 rounded-xl bg-purple-100 justify-center items-center mr-3">
-                          <Text className="text-2xl">📖</Text>
-                        </View>
-                        <View className="flex-1">
-                          <Text className="text-base font-bold text-gray-900 dark:text-light-100">
-                            {collection.name}
-                          </Text>
-                          <Text className="text-xs text-gray-500 dark:text-light-200">
-                            {collectionPoems.length} poems
-                          </Text>
-                        </View>
-                        <Text className="text-gray-400 text-xl">›</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* Poems List */}
-            <View>
-              <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-3">
-                ✍🏻 All Poems ({poems.length})
-              </Text>
-              {poems.length > 0 ? (
-  poems.map((poem, index) => {
-    let mood = null;
-    try {
-      const meta = JSON.parse(poem.metadata || "{}");
-      mood = MOOD_TAGS.find((m) => m.label === meta.mood);
-    } catch {}
-    return (
-      <View key={poem.id} className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-3 shadow-sm">
-        <TouchableOpacity
-          onPress={() => handleEditPoem(poem)}
-          onLongPress={() => handleDeletePoem(poem.id, poem.name)}
-        >
-          <View className="flex-row items-start justify-between mb-2">
-            <View className="flex-1">
-              <View className="flex-row items-center gap-2 mb-1">
-                <Text className="text-base font-bold text-gray-900 dark:text-light-100">
-                  {poem.name}
-                </Text>
-                {mood && <Text>{mood.emoji}</Text>}
-              </View>
-              <View className="flex-row gap-3">
-                <Text className="text-xs text-gray-500">
-                  {poem.word_count || 0} words
-                </Text>
-                <Text className="text-xs text-gray-500">
-                  {countLines(poem.content || "")} lines
-                </Text>
-                <Text className="text-xs text-gray-500">
-                  {countStanzas(poem.content || "")} stanzas
-                </Text>
-              </View>
-            </View>
-            <View className="w-8 h-8 rounded-full bg-primary justify-center items-center">
-              <Text className="text-white font-bold text-xs">
-                {index + 1}
-              </Text>
-            </View>
-          </View>
-          {poem.content && (
-            <View className="bg-light-100 dark:bg-dark-100 rounded-xl p-3 border-l-4 border-primary">
-              <Text
-                className="text-sm text-gray-700 dark:text-light-200 italic"
-                numberOfLines={3}
-              >
-                {poem.content}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => handleSharePoem(poem)}
-          className="mt-3 bg-blue-50 dark:bg-dark-100 py-2 rounded-xl flex-row items-center justify-center"
-        >
-          <Text className="text-blue-600 dark:text-blue-300 font-semibold text-sm mr-2">
-            Share
-          </Text>
-          <Text className="text-lg">📤</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  })
-)  : (
-                <View className="bg-white dark:bg-dark-200 rounded-2xl p-10 items-center">
-                  <Text className="text-5xl mb-3">✍🏻</Text>
-                  <Text className="text-xl font-bold text-gray-900 dark:text-light-100 mb-2">
-                    No poems yet
-                  </Text>
-                  <Text className="text-sm text-gray-600 dark:text-light-200 text-center mb-4">
-                    Let your creativity flow
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => setShowAddModal(true)}
-                    className="bg-secondary px-6 py-3 rounded-full"
-                  >
-                    <Text className="text-gray-900 font-bold">
-                      ✨ Write Your First Poem
-                    </Text>
-                  </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </View>
           </Animated.View>
-        </ScrollView>
-      </View>
 
-      {/* ==================== MODALS ==================== */}
-
-      {/* Add Poem Modal */}
-      <Modal
-        visible={showAddModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowAddModal(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="flex-1 justify-end bg-black/50"
-        >
-          <View
-            className="bg-white dark:bg-dark-200 rounded-t-3xl p-6"
-            style={{ maxHeight: "95%" }}
+          {/* Content ScrollView */}
+          <ScrollView
+            className="flex-1"
+            contentContainerStyle={{ paddingBottom: 100 }}
+            showsVerticalScrollIndicator={false}
           >
-            <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-4">
-              New Poem
-            </Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <TextInput
-                value={newPoemTitle}
-                onChangeText={setNewPoemTitle}
-                placeholder="Untitled Poem"
-                placeholderTextColor="#9CA3AF"
-                className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-4 mb-4 text-gray-900 dark:text-light-100 text-lg font-bold"
-              />
-              {project.writing_template &&
-                project.writing_template !== "freeform" && (
-                  <View className="bg-blue-50 dark:bg-dark-100 rounded-2xl p-3 mb-4">
-                    <Text className="text-sm text-blue-600 dark:text-light-200 font-semibold mb-1">
-                      📖{" "}
-                      {
-                        poetryForms.find(
-                          (f) => f.value === project.writing_template
-                        )?.label
-                      }{" "}
-                      Guide
+            <Animated.View style={{ opacity: fadeAnim }} className="px-6 py-4">
+              {/* Quick Actions */}
+
+              {/* Collections */}
+              {folders.length > 0 && (
+                <View className="mb-6">
+                  <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-3">
+                    📚 Collections
+                  </Text>
+                  {folders.map((collection) => {
+                    const collectionPoems = poems.filter(
+                      (p) => p.folder_id === collection.id
+                    );
+                    return (
+                      <TouchableOpacity
+                        key={collection.id}
+                        onLongPress={() =>
+                          handleDeleteCollection(collection.id, collection.name)
+                        }
+                        className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-3 shadow-sm"
+                      >
+                        <View className="flex-row items-center">
+                          <View className="w-12 h-12 rounded-xl bg-purple-100 justify-center items-center mr-3">
+                            <Text className="text-2xl">📖</Text>
+                          </View>
+                          <View className="flex-1">
+                            <Text className="text-base font-bold text-gray-900 dark:text-light-100">
+                              {collection.name}
+                            </Text>
+                            <Text className="text-xs text-gray-500 dark:text-light-200">
+                              {collectionPoems.length} poems
+                            </Text>
+                          </View>
+                          <Text className="text-gray-400 text-xl">›</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* Poems List */}
+              <View>
+                <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-3">
+                  ✍🏻 All Poems ({poems.length})
+                </Text>
+                {poems.length > 0 ? (
+                  poems.map((poem, index) => {
+                    let mood = null;
+                    try {
+                      const meta = JSON.parse(poem.metadata || "{}");
+                      mood = MOOD_TAGS.find((m) => m.label === meta.mood);
+                    } catch {}
+                    return (
+                      <View
+                        key={poem.id}
+                        className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-3 shadow-sm"
+                      >
+                        <TouchableOpacity
+                          onPress={() => handleEditPoem(poem)}
+                          onLongPress={() =>
+                            handleDeletePoem(poem.id, poem.name)
+                          }
+                        >
+                          <View className="flex-row items-start justify-between mb-2">
+                            <View className="flex-1">
+                              <View className="flex-row items-center gap-2 mb-1">
+                                <Text className="text-base font-bold text-gray-900 dark:text-light-100">
+                                  {poem.name}
+                                </Text>
+                                {mood && <Text>{mood.emoji}</Text>}
+                              </View>
+                              <View className="flex-row gap-3">
+                                <Text className="text-xs text-gray-500">
+                                  {poem.word_count || 0} words
+                                </Text>
+                                <Text className="text-xs text-gray-500">
+                                  {countLines(poem.content || "")} lines
+                                </Text>
+                                <Text className="text-xs text-gray-500">
+                                  {countStanzas(poem.content || "")} stanzas
+                                </Text>
+                              </View>
+                            </View>
+                            <View className="w-8 h-8 rounded-full bg-primary justify-center items-center">
+                              <Text className="text-white font-bold text-xs">
+                                {index + 1}
+                              </Text>
+                            </View>
+                          </View>
+                          {poem.content && (
+                            <View className="bg-light-100 dark:bg-dark-100 rounded-xl p-3 border-l-4 border-primary">
+                              <Text
+                                className="text-sm text-gray-700 dark:text-light-200 italic"
+                                numberOfLines={3}
+                              >
+                                {poem.content}
+                              </Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleSharePoem(poem)}
+                          className="mt-3 bg-blue-50 dark:bg-dark-100 py-2 rounded-xl flex-row items-center justify-center"
+                        >
+                          <Text className="text-blue-600 dark:text-blue-300 font-semibold text-sm mr-2">
+                            Share
+                          </Text>
+                          <Text className="text-lg">📤</Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <View className="bg-white dark:bg-dark-200 rounded-2xl p-10 items-center">
+                    <Text className="text-5xl mb-3">✍🏻</Text>
+                    <Text className="text-xl font-bold text-gray-900 dark:text-light-100 mb-2">
+                      No poems yet
                     </Text>
-                    <Text className="text-xs text-blue-500 dark:text-light-200">
-                      {
-                        poetryForms.find(
-                          (f) => f.value === project.writing_template
-                        )?.guide
-                      }
+                    <Text className="text-sm text-gray-600 dark:text-light-200 text-center mb-4">
+                      Let your creativity flow
                     </Text>
+                    <TouchableOpacity
+                      onPress={() => setShowAddModal(true)}
+                      className="bg-secondary px-6 py-3 rounded-full"
+                    >
+                      <Text className="text-gray-900 font-bold">
+                        ✨ Write Your First Poem
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 )}
-              {renderMoodSelector()}
-              <TextInput
-                value={newPoemContent}
-                onChangeText={setNewPoemContent}
-                placeholder="Write your verses here..."
-                placeholderTextColor="#9CA3AF"
-                multiline
-                textAlignVertical="top"
-                className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-4 text-gray-900 dark:text-light-100 text-base"
-                style={{ minHeight: 200, fontFamily: "serif", lineHeight: 28 }}
-              />
-
-              <View className="flex-row gap-3 mt-4">
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowAddModal(false);
-                    setNewPoemTitle("");
-                    setNewPoemContent("");
-                    setSelectedMood(null);
-                  }}
-                  className="flex-1 bg-light-100 dark:bg-dark-100 py-4 rounded-full"
-                >
-                  <Text className="text-gray-100 font-bold text-center">
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleAddPoem}
-                  className="flex-1 bg-secondary py-4 rounded-full"
-                >
-                  <Text className="text-gray-900 font-bold text-center">
-                    Save Poem
-                  </Text>
-                </TouchableOpacity>
               </View>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+            </Animated.View>
+          </ScrollView>
+        </View>
 
-      {/* Edit Poem Modal */}
-      <Modal
-        visible={!!editingPoem}
-        animationType="slide"
-        onRequestClose={() => setEditingPoem(null)}
-      >
-        <View
-          className="flex-1"
-          style={{ backgroundColor: zenMode ? selectedTheme.bg : "#F9FAFB" }}
+        {/* ==================== MODALS ==================== */}
+
+        {/* Add Poem Modal */}
+        <Modal
+          visible={showAddModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowAddModal(false)}
         >
-          {!zenMode && (
-            <View className="px-6 pt-2 pb-3 border-b border-gray-200 bg-white dark:bg-dark-300">
-              {renderFormValidationBadge()}
-              <View className="flex-row mt-2 items-center justify-between mb-3">
-                <TouchableOpacity
-                  onPress={() => setEditingPoem(null)}
-                  className="w-10 h-10 rounded-full bg-light-100 dark:bg-slate-700 dark:text-slate-200 justify-center items-center"
-                >
-                  <Text className="text-xl dark:text-slate-200">✕</Text>
-                </TouchableOpacity>
-                <View className="flex-row items-center gap-2">
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            className="flex-1 justify-end bg-black/50"
+          >
+            <View
+              className="bg-white dark:bg-dark-200 rounded-t-3xl p-6"
+              style={{ maxHeight: "95%" }}
+            >
+              <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-4">
+                New Poem
+              </Text>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <TextInput
+                  value={newPoemTitle}
+                  onChangeText={setNewPoemTitle}
+                  placeholder="Untitled Poem"
+                  placeholderTextColor="#9CA3AF"
+                  className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-4 mb-4 text-gray-900 dark:text-light-100 text-lg font-bold"
+                />
+                {project.writing_template &&
+                  project.writing_template !== "freeform" && (
+                    <View className="bg-blue-50 dark:bg-dark-100 rounded-2xl p-3 mb-4">
+                      <Text className="text-sm text-blue-600 dark:text-light-200 font-semibold mb-1">
+                        📖{" "}
+                        {
+                          poetryForms.find(
+                            (f) => f.value === project.writing_template
+                          )?.label
+                        }{" "}
+                        Guide
+                      </Text>
+                      <Text className="text-xs text-blue-500 dark:text-light-200">
+                        {
+                          poetryForms.find(
+                            (f) => f.value === project.writing_template
+                          )?.guide
+                        }
+                      </Text>
+                    </View>
+                  )}
+                {renderMoodSelector()}
+                <TextInput
+                  value={newPoemContent}
+                  onChangeText={setNewPoemContent}
+                  placeholder="Write your verses here..."
+                  placeholderTextColor="#9CA3AF"
+                  multiline
+                  textAlignVertical="top"
+                  className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-4 text-gray-900 dark:text-light-100 text-base"
+                  style={{
+                    minHeight: 200,
+                    fontFamily: "serif",
+                    lineHeight: 28,
+                  }}
+                />
+
+                <View className="flex-row gap-3 mt-4">
                   <TouchableOpacity
-                    onPress={() => setShowThemeModal(true)}
-                    className="w-10 h-10 rounded-full bg-light-100 justify-center items-center"
+                    onPress={() => {
+                      setShowAddModal(false);
+                      setNewPoemTitle("");
+                      setNewPoemContent("");
+                      setSelectedMood(null);
+                    }}
+                    className="flex-1 bg-light-100 dark:bg-dark-100 py-4 rounded-full"
                   >
-                    <Text className="text-lg">🎨</Text>
+                    <Text className="text-gray-100 font-bold text-center">
+                      Cancel
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => setZenMode(true)}
-                    className="w-10 h-10 rounded-full bg-light-100 justify-center items-center"
+                    onPress={handleAddPoem}
+                    className="flex-1 bg-secondary py-4 rounded-full"
                   >
-                    <Text className="text-lg">🧘</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleSavePoem}
-                    className="bg-secondary px-4 py-2 rounded-full"
-                  >
-                    <Text className="text-gray-900 font-bold text-sm">
-                      💾 Save
+                    <Text className="text-gray-900 font-bold text-center">
+                      Save Poem
                     </Text>
                   </TouchableOpacity>
                 </View>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+
+        {/* Edit Poem Modal */}
+        <Modal
+          visible={!!editingPoem}
+          animationType="slide"
+          onRequestClose={() => setEditingPoem(null)}
+        >
+          <View
+            className="flex-1"
+            style={{ backgroundColor: zenMode ? selectedTheme.bg : "#F9FAFB" }}
+          >
+            {!zenMode && (
+              <View className="px-6 pt-2 pb-3 border-b border-gray-200 bg-white dark:bg-dark-300">
+                <View className="flex-row mt-2 items-center justify-between mb-3">
+                  <TouchableOpacity
+                    onPress={() => setEditingPoem(null)}
+                    className="w-10 h-10 rounded-full bg-light-100 dark:bg-slate-700 dark:text-slate-200 justify-center items-center"
+                  >
+                    <Text className="text-xl dark:text-slate-200">✕</Text>
+                  </TouchableOpacity>
+                  <View className="flex-row items-center gap-2">
+                    <TouchableOpacity
+                      onPress={() => setShowPoemSearchModal(true)}
+                      className="bg-white dark:bg-dark-200 px-3 py-2 rounded-full shadow-lg"
+                    >
+                      <Text className="text-xs font-bold text-gray-900 dark:text-light-100">
+                        📚 Reference
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setShowThemeModal(true)}
+                      className="w-10 h-10 rounded-full bg-light-100 justify-center items-center"
+                    >
+                      <Text className="text-lg">🎨</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setZenMode(true)}
+                      className="w-10 h-10 rounded-full bg-light-100 justify-center items-center"
+                    >
+                      <Text className="text-lg">🧘</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleSavePoem}
+                      className="bg-secondary px-4 py-2 rounded-full"
+                    >
+                      <Text className="text-gray-900 font-bold text-sm">
+                        💾 Save
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <TextInput
+                  value={editingPoem?.name || ""}
+                  onChangeText={(text) =>
+                    setEditingPoem({ ...editingPoem, name: text })
+                  }
+                  placeholder="Poem Title"
+                  placeholderTextColor="#9CA3AF"
+                  className="bg-light-100 rounded-2xl px-4 py-3 text-gray-900 text-xl font-bold mb-2"
+                />
+                <View className="flex-row items-center justify-between">
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View className="flex-row gap-2">
+                      {MOOD_TAGS.slice(0, 6).map((mood, i) => (
+                        <TouchableOpacity
+                          key={i}
+                          onPress={() =>
+                            setSelectedMood(
+                              selectedMood?.label === mood.label ? null : mood
+                            )
+                          }
+                          className={`px-2 py-1 rounded-full ${
+                            selectedMood?.label === mood.label
+                              ? "bg-primary"
+                              : "bg-light-100"
+                          }`}
+                        >
+                          <Text className="text-xs">{mood.emoji}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    {autoSaveEnabled && (
+                      <Text className="text-xs items-center  px-4  text-green-600 text-center mt-2">
+                        ✓ Auto-saving
+                      </Text>
+                    )}
+                  </ScrollView>
+                </View>
+                {renderFormValidationBadge()}
+              </View>
+            )}
+            {zenMode && (
+              <TouchableOpacity
+                onPress={() => setZenMode(false)}
+                className="absolute top-12 right-6 z-50 w-10 h-10 rounded-full bg-black/20 justify-center items-center"
+              >
+                <Text className="text-white text-lg">✕</Text>
+              </TouchableOpacity>
+            )}
+            {renderLiveSyllableCounter()}
+            <ScrollView
+              className="flex-1"
+              contentContainerStyle={{
+                paddingHorizontal: zenMode ? 40 : 20,
+                paddingVertical: zenMode ? 60 : 20,
+                alignItems: "center",
+              }}
+              style={{ backgroundColor: selectedTheme.bg }}
+            >
+              <View
+                style={{
+                  width: zenMode ? Math.min(650, width - 80) : "100%",
+                  maxWidth: 700,
+                }}
+              >
+                <TextInput
+                  value={editingPoem?.content || ""}
+                  onChangeText={(text) =>
+                    setEditingPoem({ ...editingPoem, content: text })
+                  }
+                  placeholder="Pour your heart onto the page..."
+                  placeholderTextColor={selectedTheme.text + "60"}
+                  multiline
+                  textAlignVertical="top"
+                  style={{
+                    minHeight: height,
+                    fontSize: 18,
+                    lineHeight: 32,
+                    fontFamily: "serif",
+                    color: selectedTheme.text,
+                    backgroundColor: selectedTheme.bg,
+                    padding: zenMode ? 40 : 16,
+                  }}
+                />
+              </View>
+            </ScrollView>
+            {renderEditorToolbar()}
+            {!zenMode && (
+              <View className="bg-white border-t border-gray-200 px-6 py-3">
+                <View className="flex-row justify-between items-center">
+                  <Text className="text-sm text-gray-600">
+                    Words:{" "}
+                    {editingPoem?.content?.trim().split(/\s+/).filter(Boolean)
+                      .length || 0}
+                  </Text>
+                  <Text className="text-sm text-gray-600">
+                    Lines: {countLines(editingPoem?.content || "")}
+                  </Text>
+                  <Text className="text-sm text-gray-600">
+                    Stanzas: {countStanzas(editingPoem?.content || "")}
+                  </Text>
+                  <Text className="text-sm text-gray-600">
+                    {getReadingTime(editingPoem?.content || "")}m read
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        </Modal>
+
+        {/* Reference poetry*/}
+        <Modal
+          visible={showPoemSearchModal}
+          animationType="slide"
+          onRequestClose={() => {
+            setShowPoemSearchModal(false);
+            setSearchQuery("");
+            setSearchResults([]);
+            setSelectedPoem(null);
+          }}
+        >
+          <View className="flex-1 bg-white dark:bg-dark-300">
+            <View className="px-6 pt-4 pb-4 bg-primary">
+              <View className="flex-row items-center justify-between mb-4">
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowPoemSearchModal(false);
+                    setSearchQuery("");
+                    setSearchResults([]);
+                    setSelectedPoem(null);
+                  }}
+                  className="w-10 h-10 rounded-full bg-white/20 justify-center items-center"
+                >
+                  <Text className="text-xl text-white">✕</Text>
+                </TouchableOpacity>
+                <Text className="text-lg font-bold text-white">
+                  Poetry Reference
+                </Text>
+                <View className="w-10" />
+              </View>
+
+              {/* Search Input and Type Selector - Fixed Layout */}
+              <View className="flex-row items-center bg-white rounded-full px-4 mb-2">
+                <Text className="text-xl mr-2">🔍</Text>
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search author/title..."
+                  placeholderTextColor="#9CA3AF"
+                  className="flex-1 py-3 text-gray-900"
+                  onSubmitEditing={() => searchPoems(searchQuery)}
+                  returnKeyType="search"
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSearchQuery("");
+                      setSearchResults([]);
+                    }}
+                    className="ml-2"
+                  >
+                    <Text className="text-gray-400">✕</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Search Type Selector - Separate Row */}
+              <View className="flex-row gap-2 mb-2">
+                {(["title", "author", "both"] as const).map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    onPress={() => setSearchType(type)}
+                    className={`px-3 py-2 rounded-full ${
+                      searchType === type
+                        ? "bg-secondary"
+                        : "bg-gray-200 dark:bg-dark-100"
+                    }`}
+                  >
+                    <Text
+                      className={`text-xs font-semibold ${
+                        searchType === type
+                          ? "text-white"
+                          : "text-gray-600 dark:text-light-200"
+                      }`}
+                    >
+                      {type === "title"
+                        ? "Title"
+                        : type === "author"
+                        ? "Author"
+                        : "Both"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TouchableOpacity
+                onPress={() => searchPoems(searchQuery)}
+                className="bg-secondary py-3 rounded-full"
+                disabled={isSearching || !searchQuery.trim()}
+              >
+                <Text className="text-gray-900 font-bold text-center">
+                  {isSearching ? "Searching..." : "Search Poems"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Content Area with FlatList */}
+            <View className="flex-1 px-6">
+              {isSearching ? (
+                <View className="flex-1 justify-center items-center py-12">
+                  <Text className="text-4xl mb-3">📖</Text>
+                  <Text className="text-gray-600 dark:text-light-200">
+                    Searching poetry database...
+                  </Text>
+                </View>
+              ) : selectedPoem ? (
+                <View className="flex-1 py-4">
+                  {/* Fixed Back Button */}
+                  <TouchableOpacity
+                    onPress={() => setSelectedPoem(null)}
+                    className="flex-row items-center mb-4"
+                  >
+                    <Text className="text-primary text-lg mr-2">←</Text>
+                    <Text className="text-primary font-semibold">
+                      Back to results
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Poem Content with FlatList */}
+                  <View className="flex-1 bg-light-100 dark:bg-dark-200 rounded-2xl p-6">
+                    <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-2 text-center">
+                      {selectedPoem.title}
+                    </Text>
+                    <Text className="text-sm text-gray-600 dark:text-light-200 mb-4 text-center italic">
+                      by {selectedPoem.author}
+                    </Text>
+
+                    <FlatList
+                      data={selectedPoem.lines}
+                      keyExtractor={(item, index) => `line-${index}`}
+                      renderItem={({ item, index }) => (
+                        <Text
+                          className="text-base text-gray-800 dark:text-light-100 leading-7 mb-2"
+                          style={{ fontFamily: "serif" }}
+                        >
+                          {item}
+                        </Text>
+                      )}
+                      showsVerticalScrollIndicator={true}
+                      ListHeaderComponent={
+                        <View className="border-t border-gray-200 dark:border-gray-700 pt-4" />
+                      }
+                      ListFooterComponent={
+                        <>
+                          {selectedPoem.linecount && (
+                            <Text className="text-xs text-gray-500 dark:text-light-300 mt-4 text-center">
+                              {selectedPoem.linecount} lines
+                            </Text>
+                          )}
+                        </>
+                      }
+                    />
+                  </View>
+                </View>
+              ) : searchResults.length > 0 ? (
+                <View className="flex-1 py-4">
+                  <Text className="text-sm text-gray-600 dark:text-light-200 mb-3">
+                    Found {searchResults.length} poems
+                  </Text>
+                  <FlatList
+                    data={searchResults}
+                    keyExtractor={(item, index) =>
+                      `${item.title}-${item.author}-${index}`
+                    }
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        onPress={() => setSelectedPoem(item)}
+                        className="bg-white dark:bg-dark-200 rounded-2xl p-4 mb-3 shadow-sm"
+                      >
+                        <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-1">
+                          {item.title}
+                        </Text>
+                        <Text className="text-sm text-gray-600 dark:text-light-200 mb-2 italic">
+                          by {item.author}
+                        </Text>
+                        <Text
+                          className="text-xs text-gray-500 dark:text-light-300"
+                          numberOfLines={2}
+                        >
+                          {item.lines.slice(0, 2).join(" / ")}...
+                        </Text>
+                        <View className="flex-row items-center justify-between mt-2">
+                          <Text className="text-xs text-gray-400">
+                            {item.linecount} lines
+                          </Text>
+                          <Text className="text-primary">→</Text>
+                        </View>
+                      </TouchableOpacity>
+                    )}
+                    showsVerticalScrollIndicator={false}
+                    initialNumToRender={10}
+                    maxToRenderPerBatch={10}
+                    windowSize={5}
+                    removeClippedSubviews={true}
+                    ListEmptyComponent={
+                      <View className="items-center py-8">
+                        <Text className="text-gray-500">No poems found</Text>
+                      </View>
+                    }
+                  />
+                </View>
+              ) : searchQuery && !isSearching ? (
+                <View className="flex-1 justify-center items-center py-12">
+                  <Text className="text-4xl mb-3">📭</Text>
+                  <Text className="text-gray-600 dark:text-light-200 text-center">
+                    No poems found for "{searchQuery}"
+                  </Text>
+                  <Text className="text-sm text-gray-500 dark:text-light-300 text-center mt-2">
+                    Try searching by famous titles or authors
+                  </Text>
+                </View>
+              ) : (
+                <View className="flex-1 justify-center items-center py-12">
+                  <Text className="text-6xl mb-4">📚</Text>
+                  <Text className="text-xl font-bold text-gray-900 dark:text-light-100 mb-2">
+                    Explore Classic Poetry
+                  </Text>
+                  <Text className="text-sm text-gray-600 dark:text-light-200 text-center mb-6 px-4">
+                    Search thousands of poems by title or author for inspiration
+                    and reference
+                  </Text>
+                  <View className="bg-blue-50 dark:bg-dark-100 rounded-xl p-4 mx-4">
+                    <Text className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                      💡 Try searching:
+                    </Text>
+                    <Text className="text-xs text-blue-600 dark:text-blue-400">
+                      • "Shakespeare" • "Frost" • "Dickinson"
+                    </Text>
+                    <Text className="text-xs text-blue-600 dark:text-blue-400">
+                      • "The Road Not Taken" • "Sonnet"
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+
+        {/* Rhyme Modal */}
+        <Modal
+          visible={showRhymeModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowRhymeModal(false)}
+        >
+          <View className="flex-1 bg-black/90 justify-end">
+            <View className="bg-white dark:bg-dark-200 rounded-t-3xl p-6 max-h-[70%]">
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
+                  🎵 Rhyme Finder
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowRhymeModal(false)}
+                  className="w-8 h-8 rounded-full bg-gray-200 justify-center items-center"
+                >
+                  <Text>✕</Text>
+                </TouchableOpacity>
               </View>
               <TextInput
-                value={editingPoem?.name || ""}
-                onChangeText={(text) =>
-                  setEditingPoem({ ...editingPoem, name: text })
-                }
-                placeholder="Poem Title"
+                value={rhymeWord}
+                onChangeText={setRhymeWord}
+                placeholder="Type a word to find rhymes..."
                 placeholderTextColor="#9CA3AF"
-                className="bg-light-100 rounded-2xl px-4 py-3 text-gray-900 text-xl font-bold mb-2"
+                className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-3 mb-4 text-gray-900 dark:text-light-100"
+                autoFocus
               />
-              <View className="flex-row items-center justify-between">
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View className="flex-row gap-2">
-                    {MOOD_TAGS.slice(0, 6).map((mood, i) => (
+              {foundRhymes.length > 0 ? (
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  <View className="flex-row flex-wrap gap-2">
+                    {foundRhymes.map((rhyme, i) => (
                       <TouchableOpacity
                         key={i}
-                        onPress={() =>
-                          setSelectedMood(
-                            selectedMood?.label === mood.label ? null : mood
-                          )
-                        }
-                        className={`px-2 py-1 rounded-full ${
-                          selectedMood?.label === mood.label
-                            ? "bg-primary"
-                            : "bg-light-100"
-                        }`}
+                        onPress={() => {
+                          insertWordAtCursor(rhyme);
+                          Vibration.vibrate(30);
+                        }}
+                        className="bg-purple-100 dark:bg-purple-200 px-4 py-2 rounded-full"
                       >
-                        <Text className="text-xs">{mood.emoji}</Text>
+                        <Text className="text-purple-700 dark:text-purple-900 font-semibold">
+                          {rhyme}
+                        </Text>
                       </TouchableOpacity>
                     ))}
                   </View>
                 </ScrollView>
-              </View>
-              {autoSaveEnabled && (
-                <Text className="text-xs text-green-600 text-center mt-2">
-                  ✓ Auto-saving
+              ) : rhymeWord ? (
+                <Text className="text-gray-500 text-center py-8">
+                  No rhymes found. Try another word!
                 </Text>
+              ) : (
+                <View className="py-8 items-center">
+                  <Text className="text-4xl mb-2">🎶</Text>
+                  <Text className="text-gray-500 text-center">
+                    Enter a word to discover rhyming possibilities
+                  </Text>
+                </View>
               )}
-            </View>
-          )}
-          {zenMode && (
-            <TouchableOpacity
-              onPress={() => setZenMode(false)}
-              className="absolute top-12 right-6 z-50 w-10 h-10 rounded-full bg-black/20 justify-center items-center"
-            >
-              <Text className="text-white text-lg">✕</Text>
-            </TouchableOpacity>
-          )}
-          {renderLiveSyllableCounter()}
-          <ScrollView
-            className="flex-1"
-            contentContainerStyle={{
-              paddingHorizontal: zenMode ? 40 : 20,
-              paddingVertical: zenMode ? 60 : 20,
-              alignItems: "center",
-            }}
-            style={{ backgroundColor: selectedTheme.bg }}
-          >
-            <View
-              style={{
-                width: zenMode ? Math.min(650, width - 80) : "100%",
-                maxWidth: 700,
-              }}
-            >
-              <TextInput
-                value={editingPoem?.content || ""}
-                onChangeText={(text) =>
-                  setEditingPoem({ ...editingPoem, content: text })
-                }
-                placeholder="Pour your heart onto the page..."
-                placeholderTextColor={selectedTheme.text + "60"}
-                multiline
-                textAlignVertical="top"
-                style={{
-                  minHeight: height - 350,
-                  fontSize: 18,
-                  lineHeight: 32,
-                  fontFamily: "serif",
-                  color: selectedTheme.text,
-                  backgroundColor: selectedTheme.bg,
-                  padding: zenMode ? 40 : 16,
-                }}
-              />
-            </View>
-          </ScrollView>
-          {renderEditorToolbar()}
-          {!zenMode && (
-            <View className="bg-white border-t border-gray-200 px-6 py-3">
-              <View className="flex-row justify-between items-center">
-                <Text className="text-sm text-gray-600">
-                  Words:{" "}
-                  {editingPoem?.content?.trim().split(/\s+/).filter(Boolean)
-                    .length || 0}
-                </Text>
-                <Text className="text-sm text-gray-600">
-                  Lines: {countLines(editingPoem?.content || "")}
-                </Text>
-                <Text className="text-sm text-gray-600">
-                  Stanzas: {countStanzas(editingPoem?.content || "")}
-                </Text>
-                <Text className="text-sm text-gray-600">
-                  {getReadingTime(editingPoem?.content || "")}m read
-                </Text>
-              </View>
-            </View>
-          )}
-        </View>
-      </Modal>
-
-      {/* Rhyme Modal */}
-      <Modal
-        visible={showRhymeModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowRhymeModal(false)}
-      >
-        <View className="flex-1 bg-black/90 justify-end">
-          <View className="bg-white dark:bg-dark-200 rounded-t-3xl p-6 max-h-[70%]">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
-                🎵 Rhyme Finder
-              </Text>
               <TouchableOpacity
                 onPress={() => setShowRhymeModal(false)}
-                className="w-8 h-8 rounded-full bg-gray-200 justify-center items-center"
+                className="bg-primary py-3 rounded-full mt-4"
               >
-                <Text>✕</Text>
+                <Text className="text-white font-bold text-center">Close</Text>
               </TouchableOpacity>
             </View>
-            <TextInput
-              value={rhymeWord}
-              onChangeText={setRhymeWord}
-              placeholder="Type a word to find rhymes..."
-              placeholderTextColor="#9CA3AF"
-              className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-3 mb-4 text-gray-900 dark:text-light-100"
-              autoFocus
-            />
-            {foundRhymes.length > 0 ? (
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <View className="flex-row flex-wrap gap-2">
-                  {foundRhymes.map((rhyme, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      onPress={() => {
-                        insertWordAtCursor(rhyme);
-                        Vibration.vibrate(30);
-                      }}
-                      className="bg-purple-100 dark:bg-purple-200 px-4 py-2 rounded-full"
-                    >
-                      <Text className="text-purple-700 dark:text-purple-900 font-semibold">
-                        {rhyme}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-            ) : rhymeWord ? (
-              <Text className="text-gray-500 text-center py-8">
-                No rhymes found. Try another word!
-              </Text>
-            ) : (
-              <View className="py-8 items-center">
-                <Text className="text-4xl mb-2">🎶</Text>
-                <Text className="text-gray-500 text-center">
-                  Enter a word to discover rhyming possibilities
-                </Text>
-              </View>
-            )}
-            <TouchableOpacity
-              onPress={() => setShowRhymeModal(false)}
-              className="bg-primary py-3 rounded-full mt-4"
-            >
-              <Text className="text-white font-bold text-center">Close</Text>
-            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Word Palette Modal */}
-      <Modal
-        visible={showWordPalette}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowWordPalette(false)}
-      >
-        <View className="flex-1 bg-black/90 justify-end">
-          <View className="bg-white dark:bg-dark-200 rounded-t-3xl p-6 max-h-[80%]">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
-                🎨 Word Palette
-              </Text>
+        {/* Word Palette Modal */}
+        <Modal
+          visible={showWordPalette}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowWordPalette(false)}
+        >
+          <View className="flex-1 bg-black/90 justify-end">
+            <View className="bg-white dark:bg-dark-200 rounded-t-3xl p-6 max-h-[80%]">
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
+                  🎨 Word Palette
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowWordPalette(false)}
+                  className="w-8 h-8 rounded-full bg-gray-200 justify-center items-center"
+                >
+                  <Text>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {Object.entries(POWER_WORDS).map(([category, words]) => (
+                  <View key={category} className="mb-4">
+                    <Text className="text-sm font-bold text-gray-700 dark:text-light-200 mb-2 capitalize">
+                      {category}
+                    </Text>
+                    <View className="flex-row flex-wrap gap-2">
+                      {words.map((word, i) => (
+                        <TouchableOpacity
+                          key={i}
+                          onPress={() => {
+                            insertWordAtCursor(word);
+                            Vibration.vibrate(30);
+                          }}
+                          className="bg-purple-50 dark:bg-dark-100 px-3 py-2 rounded-full border border-purple-200"
+                        >
+                          <Text className="text-purple-700 dark:text-light-200 text-sm">
+                            {word}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
               <TouchableOpacity
                 onPress={() => setShowWordPalette(false)}
-                className="w-8 h-8 rounded-full bg-gray-200 justify-center items-center"
+                className="bg-primary py-3 rounded-full mt-4"
               >
-                <Text>✕</Text>
+                <Text className="text-white font-bold text-center">Close</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {Object.entries(POWER_WORDS).map(([category, words]) => (
-                <View key={category} className="mb-4">
-                  <Text className="text-sm font-bold text-gray-700 dark:text-light-200 mb-2 capitalize">
-                    {category}
+          </View>
+        </Modal>
+
+        {/* Meter Modal */}
+        <Modal
+          visible={showMeterModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowMeterModal(false)}
+        >
+          <View className="flex-1 bg-black/90 justify-center items-center px-4">
+            <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md max-h-[85%]">
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
+                  📏 Meter & Stress
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowMeterModal(false)}
+                  className="w-8 h-8 rounded-full bg-gray-200 justify-center items-center"
+                >
+                  <Text>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {editingPoem?.content ? (
+                  <>
+                    <Text className="text-sm text-gray-600 dark:text-light-200 mb-3">
+                      x = unstressed, X = stressed
+                    </Text>
+                    {editingPoem.content
+                      .split("\n")
+                      .filter((l: string) => l.trim())
+                      .slice(0, 8)
+                      .map((line: string, i: number) => (
+                        <View
+                          key={i}
+                          className="bg-light-100 dark:bg-dark-100 rounded-xl p-3 mb-2"
+                        >
+                          <Text
+                            className="text-sm text-gray-900 dark:text-light-100 mb-1"
+                            numberOfLines={1}
+                          >
+                            {line}
+                          </Text>
+                          <Text className="text-xs font-mono text-purple-400 dark:text-purple-300">
+                            {analyzeStressPattern(line)}
+                          </Text>
+                        </View>
+                      ))}
+                    <View className="bg-blue-50 dark:bg-dark-100 rounded-xl p-4 mt-4">
+                      <Text className="text-sm font-bold text-blue-500 mb-2">
+                        Common Meters:
+                      </Text>
+                      <Text className="text-xs text-blue-400 mb-1">
+                        • Iambic: xX xX xX xX xX (da-DUM)
+                      </Text>
+                      <Text className="text-xs text-blue-400 mb-1">
+                        • Trochaic: Xx Xx Xx Xx (DUM-da)
+                      </Text>
+                      <Text className="text-xs text-blue-400 mb-1">
+                        • Anapestic: xxX xxX xxX (da-da-DUM)
+                      </Text>
+                      <Text className="text-xs text-blue-400">
+                        • Dactylic: Xxx Xxx Xxx (DUM-da-da)
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <Text className="text-gray-500 text-center py-8">
+                    Write some lines to analyze meter
                   </Text>
-                  <View className="flex-row flex-wrap gap-2">
-                    {words.map((word, i) => (
+                )}
+              </ScrollView>
+              <TouchableOpacity
+                onPress={() => setShowMeterModal(false)}
+                className="bg-primary py-3 rounded-full mt-4"
+              >
+                <Text className="text-white font-bold text-center">Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Goals Modal */}
+        <Modal
+          visible={showGoalsModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowGoalsModal(false)}
+        >
+          <View className="flex-1 bg-black/90 justify-center items-center px-4">
+            <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md">
+              <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-4 text-center">
+                🎯 Poetry Goals
+              </Text>
+              <View className="bg-gradient-to-r from-green-100 to-emerald-100 rounded-2xl p-4 mb-4">
+                <Text className="text-sm text-green-700 mb-2">Daily Poems</Text>
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-3xl font-bold text-green-800">
+                    {poemsToday}/{dailyPoemGoal}
+                  </Text>
+                  <View className="flex-row gap-2">
+                    {[1, 2, 3, 5].map((n) => (
                       <TouchableOpacity
-                        key={i}
+                        key={n}
                         onPress={() => {
-                          insertWordAtCursor(word);
-                          Vibration.vibrate(30);
+                          setDailyPoemGoal(n);
+                          setSetting(
+                            `poetry_daily_goal_${projectId}`,
+                            n.toString()
+                          );
                         }}
-                        className="bg-purple-50 dark:bg-dark-100 px-3 py-2 rounded-full border border-purple-200"
+                        className={`w-8 h-8 rounded-full justify-center items-center ${
+                          dailyPoemGoal === n ? "bg-green-500" : "bg-white"
+                        }`}
                       >
-                        <Text className="text-purple-700 dark:text-light-200 text-sm">
-                          {word}
+                        <Text
+                          className={
+                            dailyPoemGoal === n
+                              ? "text-white font-bold"
+                              : "text-green-700"
+                          }
+                        >
+                          {n}
                         </Text>
                       </TouchableOpacity>
                     ))}
                   </View>
                 </View>
-              ))}
-            </ScrollView>
-            <TouchableOpacity
-              onPress={() => setShowWordPalette(false)}
-              className="bg-primary py-3 rounded-full mt-4"
-            >
-              <Text className="text-white font-bold text-center">Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+                <View className="h-2 bg-green-200 rounded-full mt-2 overflow-hidden">
+                  <View
+                    className="h-full bg-green-500 rounded-full"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        (poemsToday / dailyPoemGoal) * 100
+                      )}%`,
+                    }}
+                  />
+                </View>
+              </View>
 
-      {/* Meter Modal */}
-      <Modal
-        visible={showMeterModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowMeterModal(false)}
-      >
-        <View className="flex-1 bg-black/90 justify-center items-center px-4">
-          <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md max-h-[85%]">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
-                📏 Meter & Stress
-              </Text>
+              {poemsToday >= dailyPoemGoal && (
+                <View className="bg-yellow-100 rounded-2xl p-4 items-center mb-4">
+                  <Text className="text-4xl mb-2">🏆</Text>
+                  <Text className="text-yellow-800 font-bold">
+                    Daily goal achieved!
+                  </Text>
+                </View>
+              )}
               <TouchableOpacity
-                onPress={() => setShowMeterModal(false)}
-                className="w-8 h-8 rounded-full bg-gray-200 justify-center items-center"
+                onPress={() => setShowGoalsModal(false)}
+                className="bg-primary py-3 rounded-full"
               >
-                <Text>✕</Text>
+                <Text className="text-white font-bold text-center">Close</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {editingPoem?.content ? (
-                <>
-                  <Text className="text-sm text-gray-600 dark:text-light-200 mb-3">
-                    x = unstressed, X = stressed
-                  </Text>
-                  {editingPoem.content
-                    .split("\n")
-                    .filter((l: string) => l.trim())
-                    .slice(0, 8)
-                    .map((line: string, i: number) => (
+          </View>
+        </Modal>
+
+        {/* Analysis Modal */}
+        <Modal
+          visible={showAnalysisModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowAnalysisModal(false)}
+        >
+          <View className="flex-1 bg-black/90 justify-center items-center px-4">
+            <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md max-h-[90%]">
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
+                  📊 Deep Analysis
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowAnalysisModal(false)}
+                  className="w-8 h-8 rounded-full bg-gray-200 justify-center items-center"
+                >
+                  <Text>✕</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {editingPoem && (
+                  <>
+                    <View className="flex-row gap-2 mb-4">
+                      <View className="flex-1 bg-purple-100 rounded-xl p-3">
+                        <Text className="text-xs text-purple-600">Words</Text>
+                        <Text className="text-xl font-bold text-purple-900">
+                          {editingPoem.content
+                            ?.trim()
+                            .split(/\s+/)
+                            .filter(Boolean).length || 0}
+                        </Text>
+                      </View>
+                      <View className="flex-1 bg-pink-100 rounded-xl p-3">
+                        <Text className="text-xs text-pink-600">Lines</Text>
+                        <Text className="text-xl font-bold text-pink-900">
+                          {countLines(editingPoem.content || "")}
+                        </Text>
+                      </View>
+                      <View className="flex-1 bg-blue-100 rounded-xl p-3">
+                        <Text className="text-xs text-blue-600">Stanzas</Text>
+                        <Text className="text-xl font-bold text-blue-900">
+                          {countStanzas(editingPoem.content || "")}
+                        </Text>
+                      </View>
+                    </View>
+                    <View className="bg-light-100 dark:bg-dark-100 rounded-xl p-4 mb-3">
+                      <Text className="text-sm font-bold text-gray-700 dark:text-light-200 mb-2">
+                        🎵 Rhyme Scheme
+                      </Text>
+                      <Text className="text-2xl font-mono text-purple-400 dark:text-purple-200">
+                        {detectRhymeScheme(editingPoem.content || "") ||
+                          "No pattern"}
+                      </Text>
+                    </View>
+                    <View className="bg-light-100 dark:bg-dark-100 rounded-xl p-4 mb-3">
+                      <Text className="text-sm font-bold text-gray-700 dark:text-light-200 mb-2">
+                        🔄 Repeated Words
+                      </Text>
+                      <View className="flex-row flex-wrap gap-2">
+                        {getWordFrequency(editingPoem.content || "").map(
+                          (item, i) => (
+                            <View
+                              key={i}
+                              className="bg-white dark:bg-dark-200 px-3 py-1 rounded-full"
+                            >
+                              <Text className="text-xs text-gray-700 dark:text-light-200">
+                                {item.word} ({item.count}×)
+                              </Text>
+                            </View>
+                          )
+                        )}
+                        {getWordFrequency(editingPoem.content || "").length ===
+                          0 && (
+                          <Text className="text-xs text-gray-500">
+                            No significant repetitions
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    <View className="bg-light-100 dark:bg-dark-100 rounded-xl p-4 mb-3">
+                      <Text className="text-sm font-bold text-gray-700 dark:text-light-200 mb-2">
+                        ✨ Alliteration Found
+                      </Text>
+                      <View className="flex-row flex-wrap gap-2">
+                        {getAlliteration(editingPoem.content || "")
+                          .slice(0, 8)
+                          .map((pair, i) => (
+                            <View
+                              key={i}
+                              className="bg-green-100 px-3 py-1 rounded-full"
+                            >
+                              <Text className="text-xs text-green-700">
+                                {pair}
+                              </Text>
+                            </View>
+                          ))}
+                        {getAlliteration(editingPoem.content || "").length ===
+                          0 && (
+                          <Text className="text-xs text-gray-500">
+                            None detected
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    {formValidation && (
                       <View
-                        key={i}
-                        className="bg-light-100 dark:bg-dark-100 rounded-xl p-3 mb-2"
+                        className={`rounded-xl p-4 ${
+                          formValidation.valid
+                            ? "bg-green-100"
+                            : "bg-orange-100"
+                        }`}
                       >
                         <Text
-                          className="text-sm text-gray-900 dark:text-light-100 mb-1"
-                          numberOfLines={1}
+                          className={`text-sm font-bold ${
+                            formValidation.valid
+                              ? "text-green-700"
+                              : "text-orange-700"
+                          }`}
                         >
-                          {line}
+                          {formValidation.valid
+                            ? "✅ Form Check"
+                            : "⚠️ Form Check"}
                         </Text>
-                        <Text className="text-xs font-mono text-purple-400 dark:text-purple-300">
-                          {analyzeStressPattern(line)}
+                        <Text
+                          className={`text-xs mt-1 ${
+                            formValidation.valid
+                              ? "text-green-600"
+                              : "text-orange-600"
+                          }`}
+                        >
+                          {formValidation.message}
                         </Text>
                       </View>
-                    ))}
-                  <View className="bg-blue-50 dark:bg-dark-100 rounded-xl p-4 mt-4">
-                    <Text className="text-sm font-bold text-blue-500 mb-2">
-                      Common Meters:
-                    </Text>
-                    <Text className="text-xs text-blue-400 mb-1">
-                      • Iambic: xX xX xX xX xX (da-DUM)
-                    </Text>
-                    <Text className="text-xs text-blue-400 mb-1">
-                      • Trochaic: Xx Xx Xx Xx (DUM-da)
-                    </Text>
-                    <Text className="text-xs text-blue-400 mb-1">
-                      • Anapestic: xxX xxX xxX (da-da-DUM)
-                    </Text>
-                    <Text className="text-xs text-blue-400">
-                      • Dactylic: Xxx Xxx Xxx (DUM-da-da)
-                    </Text>
-                  </View>
-                </>
-              ) : (
-                <Text className="text-gray-500 text-center py-8">
-                  Write some lines to analyze meter
-                </Text>
-              )}
-            </ScrollView>
-            <TouchableOpacity
-              onPress={() => setShowMeterModal(false)}
-              className="bg-primary py-3 rounded-full mt-4"
-            >
-              <Text className="text-white font-bold text-center">Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Goals Modal */}
-      <Modal
-        visible={showGoalsModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowGoalsModal(false)}
-      >
-        <View className="flex-1 bg-black/90 justify-center items-center px-4">
-          <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md">
-            <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-4 text-center">
-              🎯 Poetry Goals
-            </Text>
-            <View className="bg-gradient-to-r from-green-100 to-emerald-100 rounded-2xl p-4 mb-4">
-              <Text className="text-sm text-green-700 mb-2">Daily Poems</Text>
-              <View className="flex-row items-center justify-between">
-                <Text className="text-3xl font-bold text-green-800">
-                  {poemsToday}/{dailyPoemGoal}
-                </Text>
-                <View className="flex-row gap-2">
-                  {[1, 2, 3, 5].map((n) => (
-                    <TouchableOpacity
-                      key={n}
-                      onPress={() => {
-                        setDailyPoemGoal(n);
-                        setSetting(
-                          `poetry_daily_goal_${projectId}`,
-                          n.toString()
-                        );
-                      }}
-                      className={`w-8 h-8 rounded-full justify-center items-center ${
-                        dailyPoemGoal === n ? "bg-green-500" : "bg-white"
-                      }`}
-                    >
-                      <Text
-                        className={
-                          dailyPoemGoal === n
-                            ? "text-white font-bold"
-                            : "text-green-700"
-                        }
-                      >
-                        {n}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-              <View className="h-2 bg-green-200 rounded-full mt-2 overflow-hidden">
-                <View
-                  className="h-full bg-green-500 rounded-full"
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      (poemsToday / dailyPoemGoal) * 100
-                    )}%`,
-                  }}
-                />
-              </View>
-            </View>
-
-            {poemsToday >= dailyPoemGoal && (
-              <View className="bg-yellow-100 rounded-2xl p-4 items-center mb-4">
-                <Text className="text-4xl mb-2">🏆</Text>
-                <Text className="text-yellow-800 font-bold">
-                  Daily goal achieved!
-                </Text>
-              </View>
-            )}
-            <TouchableOpacity
-              onPress={() => setShowGoalsModal(false)}
-              className="bg-primary py-3 rounded-full"
-            >
-              <Text className="text-white font-bold text-center">Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Analysis Modal */}
-      <Modal
-        visible={showAnalysisModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowAnalysisModal(false)}
-      >
-        <View className="flex-1 bg-black/90 justify-center items-center px-4">
-          <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md max-h-[90%]">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
-                📊 Deep Analysis
-              </Text>
+                    )}
+                  </>
+                )}
+              </ScrollView>
               <TouchableOpacity
                 onPress={() => setShowAnalysisModal(false)}
-                className="w-8 h-8 rounded-full bg-gray-200 justify-center items-center"
+                className="bg-primary py-3 rounded-full mt-4"
               >
-                <Text>✕</Text>
+                <Text className="text-white font-bold text-center">Close</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {editingPoem && (
-                <>
-                  <View className="flex-row gap-2 mb-4">
-                    <View className="flex-1 bg-purple-100 rounded-xl p-3">
-                      <Text className="text-xs text-purple-600">Words</Text>
-                      <Text className="text-xl font-bold text-purple-900">
-                        {editingPoem.content
-                          ?.trim()
-                          .split(/\s+/)
-                          .filter(Boolean).length || 0}
-                      </Text>
-                    </View>
-                    <View className="flex-1 bg-pink-100 rounded-xl p-3">
-                      <Text className="text-xs text-pink-600">Lines</Text>
-                      <Text className="text-xl font-bold text-pink-900">
-                        {countLines(editingPoem.content || "")}
-                      </Text>
-                    </View>
-                    <View className="flex-1 bg-blue-100 rounded-xl p-3">
-                      <Text className="text-xs text-blue-600">Stanzas</Text>
-                      <Text className="text-xl font-bold text-blue-900">
-                        {countStanzas(editingPoem.content || "")}
-                      </Text>
-                    </View>
-                  </View>
-                  <View className="bg-light-100 dark:bg-dark-100 rounded-xl p-4 mb-3">
-                    <Text className="text-sm font-bold text-gray-700 dark:text-light-200 mb-2">
-                      🎵 Rhyme Scheme
-                    </Text>
-                    <Text className="text-2xl font-mono text-purple-400 dark:text-purple-200">
-                      {detectRhymeScheme(editingPoem.content || "") ||
-                        "No pattern"}
-                    </Text>
-                  </View>
-                  <View className="bg-light-100 dark:bg-dark-100 rounded-xl p-4 mb-3">
-                    <Text className="text-sm font-bold text-gray-700 dark:text-light-200 mb-2">
-                      🔄 Repeated Words
-                    </Text>
-                    <View className="flex-row flex-wrap gap-2">
-                      {getWordFrequency(editingPoem.content || "").map(
-                        (item, i) => (
-                          <View
-                            key={i}
-                            className="bg-white dark:bg-dark-200 px-3 py-1 rounded-full"
-                          >
-                            <Text className="text-xs text-gray-700 dark:text-light-200">
-                              {item.word} ({item.count}×)
-                            </Text>
-                          </View>
-                        )
-                      )}
-                      {getWordFrequency(editingPoem.content || "").length ===
-                        0 && (
-                        <Text className="text-xs text-gray-500">
-                          No significant repetitions
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                  <View className="bg-light-100 dark:bg-dark-100 rounded-xl p-4 mb-3">
-                    <Text className="text-sm font-bold text-gray-700 dark:text-light-200 mb-2">
-                      ✨ Alliteration Found
-                    </Text>
-                    <View className="flex-row flex-wrap gap-2">
-                      {getAlliteration(editingPoem.content || "")
-                        .slice(0, 8)
-                        .map((pair, i) => (
-                          <View
-                            key={i}
-                            className="bg-green-100 px-3 py-1 rounded-full"
-                          >
-                            <Text className="text-xs text-green-700">
-                              {pair}
-                            </Text>
-                          </View>
-                        ))}
-                      {getAlliteration(editingPoem.content || "").length ===
-                        0 && (
-                        <Text className="text-xs text-gray-500">
-                          None detected
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                  {formValidation && (
-                    <View
-                      className={`rounded-xl p-4 ${
-                        formValidation.valid ? "bg-green-100" : "bg-orange-100"
-                      }`}
-                    >
-                      <Text
-                        className={`text-sm font-bold ${
-                          formValidation.valid
-                            ? "text-green-700"
-                            : "text-orange-700"
-                        }`}
-                      >
-                        {formValidation.valid
-                          ? "✅ Form Check"
-                          : "⚠️ Form Check"}
-                      </Text>
-                      <Text
-                        className={`text-xs mt-1 ${
-                          formValidation.valid
-                            ? "text-green-600"
-                            : "text-orange-600"
-                        }`}
-                      >
-                        {formValidation.message}
-                      </Text>
-                    </View>
-                  )}
-                </>
-              )}
-            </ScrollView>
-            <TouchableOpacity
-              onPress={() => setShowAnalysisModal(false)}
-              className="bg-primary py-3 rounded-full mt-4"
-            >
-              <Text className="text-white font-bold text-center">Close</Text>
-            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Form Selection Modal */}
-      <Modal
-        visible={showFormModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowFormModal(false)}
-      >
-        <View className="flex-1 bg-black/90 justify-center items-center px-6">
-          <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md max-h-[85%]">
-            <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-4 text-center">
-              🎨 Poetry Form
-            </Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {poetryForms.map((form) => (
-                <TouchableOpacity
-                  key={form.value}
-                  onPress={() => handleUpdateForm(form.value)}
-                  className={`p-4 rounded-2xl mb-3 border-2 ${
-                    project?.writing_template === form.value
-                      ? "border-primary bg-primary/10"
-                      : "border-gray-200 bg-light-100"
-                  }`}
-                >
-                  <View className="flex-row items-start">
-                    <Text className="text-3xl mr-3">{form.icon}</Text>
-                    <View className="flex-1">
-                      <Text
-                        className={`font-bold text-base mb-1 ${
-                          project?.writing_template === form.value
-                            ? "text-primary"
-                            : "text-gray-900"
-                        }`}
-                      >
-                        {form.label}
-                      </Text>
-                      <Text className="text-sm text-gray-600 mb-1">
-                        {form.desc}
-                      </Text>
-                      {form.guide && (
-                        <Text className="text-xs text-gray-500 italic">
-                          {form.guide}
-                        </Text>
-                      )}
-                    </View>
-                    {project?.writing_template === form.value && (
-                      <Text className="text-primary text-2xl">✓</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                onPress={() => setShowFormModal(false)}
-                className="bg-light-100 py-4 rounded-full mt-2"
-              >
-                <Text className="text-gray-600 font-bold text-center">
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Inspiration Modal */}
-      <Modal
-        visible={showInspirationModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowInspirationModal(false)}
-      >
-        <View className="flex-1 bg-black/90 justify-center items-center px-6">
-          <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md max-h-[80%]">
-            <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-4 text-center">
-              💡 Inspiration
-            </Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View className="bg-purple-100 rounded-2xl p-4 mb-4">
-                <Text className="text-sm font-semibold text-purple-900 mb-2">
-                  ✨ Random Prompt
-                </Text>
-                <Text className="text-purple-700 italic">
-                  "{generateInspiration()}"
-                </Text>
-              </View>
-              <Text className="text-lg font-bold text-gray-900 dark:text-gray-50 mb-3">
-                Explore Themes
+        {/* Form Selection Modal */}
+        <Modal
+          visible={showFormModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowFormModal(false)}
+        >
+          <View className="flex-1 bg-black/90 justify-center items-center px-6">
+            <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md max-h-[85%]">
+              <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-4 text-center">
+                🎨 Poetry Form
               </Text>
-              {writingThemes.map((theme, index) => (
-                <TouchableOpacity
-                  key={index}
-                  className="bg-light-100 dark:bg-slate-600 rounded-2xl p-4 mb-3"
-                  onPress={() => {
-                    setNewPoemTitle(`${theme.name}`);
-                    setShowInspirationModal(false);
-                    setShowAddModal(true);
-                  }}
-                >
-                  <View className="flex-row items-center mb-2">
-                    <Text className="text-2xl mr-2">{theme.emoji}</Text>
-                    <Text className="text-base font-bold text-gray-900 dark:text-white">
-                      {theme.name}
-                    </Text>
-                  </View>
-                  <View className="flex-row flex-wrap gap-2">
-                    {theme.prompts.map((prompt, i) => (
-                      <View key={i} className="bg-white px-2 py-1 rounded-full">
-                        <Text className="text-xs text-gray-600">{prompt}</Text>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {poetryForms.map((form) => (
+                  <TouchableOpacity
+                    key={form.value}
+                    onPress={() => handleUpdateForm(form.value)}
+                    className={`p-4 rounded-2xl mb-3 border-2 ${
+                      project?.writing_template === form.value
+                        ? "border-primary bg-primary/10"
+                        : "border-gray-200 bg-light-100"
+                    }`}
+                  >
+                    <View className="flex-row items-start">
+                      <Text className="text-3xl mr-3">{form.icon}</Text>
+                      <View className="flex-1">
+                        <Text
+                          className={`font-bold text-base mb-1 ${
+                            project?.writing_template === form.value
+                              ? "text-primary"
+                              : "text-gray-900"
+                          }`}
+                        >
+                          {form.label}
+                        </Text>
+                        <Text className="text-sm text-gray-600 mb-1">
+                          {form.desc}
+                        </Text>
+                        {form.guide && (
+                          <Text className="text-xs text-gray-500 italic">
+                            {form.guide}
+                          </Text>
+                        )}
                       </View>
-                    ))}
-                  </View>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                onPress={() => setShowInspirationModal(false)}
-                className="bg-light-100 py-4 rounded-full mt-2"
-              >
-                <Text className="text-gray-600 font-bold text-center">
-                  Close
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Theme Modal */}
-      <Modal
-        visible={showThemeModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowThemeModal(false)}
-      >
-        <View className="flex-1 bg-black/90 justify-center items-center px-6">
-          <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md">
-            <Text className="text-2xl font-bold text-gray-900 mb-4 text-center">
-              🎨 Editor Theme
-            </Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {colorThemes.map((theme, index) => (
-                <TouchableOpacity
-                  key={index}
-                  onPress={() => {
-                    setSelectedTheme(theme);
-                    setWritingSetting({
-                      projectId: projectId,
-                      backgroundColor: theme.bg,
-                      textColor: theme.text,
-                    });
-                    setShowThemeModal(false);
-                  }}
-                  className="mb-3 rounded-2xl overflow-hidden border-2"
-                  style={{
-                    borderColor:
-                      selectedTheme.name === theme.name
-                        ? theme.accent
-                        : "#E5E7EB",
-                  }}
-                >
-                  <View style={{ backgroundColor: theme.bg }} className="p-4">
-                    <Text
-                      style={{ color: theme.text }}
-                      className="font-bold text-lg mb-2"
-                    >
-                      {theme.name}
-                    </Text>
-                    <View className="flex-row gap-2">
-                      <View
-                        style={{ backgroundColor: theme.accent }}
-                        className="w-8 h-8 rounded-full"
-                      />
-                      <View
-                        style={{ backgroundColor: theme.text + "40" }}
-                        className="w-8 h-8 rounded-full"
-                      />
+                      {project?.writing_template === form.value && (
+                        <Text className="text-primary text-2xl">✓</Text>
+                      )}
                     </View>
-                  </View>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  onPress={() => setShowFormModal(false)}
+                  className="bg-light-100 py-4 rounded-full mt-2"
+                >
+                  <Text className="text-gray-600 font-bold text-center">
+                    Cancel
+                  </Text>
                 </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                onPress={() => setShowThemeModal(false)}
-                className="bg-light-100 py-4 rounded-full mt-2"
-              >
-                <Text className="text-gray-600 font-bold text-center">
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Book Preview Modal */}
-      <Modal
-        visible={showBookPreview}
-        animationType="slide"
-        onRequestClose={() => setShowBookPreview(false)}
-      >
-        <View className="flex-1 bg-gray-900">
-          <View className="px-6 pt-16 pb-4 bg-black/50">
-            <View className="flex-row items-center justify-between">
-              <TouchableOpacity
-                onPress={() => setShowBookPreview(false)}
-                className="w-10 h-10 rounded-full bg-white/20 justify-center items-center"
-              >
-                <Text className="text-xl text-white">✕</Text>
-              </TouchableOpacity>
-              <Text className="text-lg font-bold text-white">
-                Poetry Preview
-              </Text>
-              <View className="w-10" />
+              </ScrollView>
             </View>
           </View>
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onScroll={(e) => {
-              setCurrentPage(Math.round(e.nativeEvent.contentOffset.x / width));
-            }}
-            scrollEventThrottle={16}
-          >
-            {poems.map((poem, index) => (
-              <View
-                key={poem.id}
-                className="px-8 py-12 justify-center"
-                style={{
-                  width,
-                  backgroundColor: selectedTheme.text,
-                }}
-              >
-                <View
-                  className="bg-white rounded-2xl p-6 shadow-2xl"
-                  style={{
-                    height: width * 1.6,
-                    backgroundColor: selectedTheme.bg,
-                  }}
-                >
-                  <Text
-                    className="text-xl font-bold mb-4 text-center"
-                    style={{ color: selectedTheme.text }}
-                  >
-                    {poem.name}
+        </Modal>
+
+        {/* Inspiration Modal */}
+        <Modal
+          visible={showInspirationModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowInspirationModal(false)}
+        >
+          <View className="flex-1 bg-black/90 justify-center items-center px-6">
+            <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md max-h-[80%]">
+              <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-4 text-center">
+                💡 Inspiration
+              </Text>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View className="bg-purple-100 rounded-2xl p-4 mb-4">
+                  <Text className="text-sm font-semibold text-purple-900 mb-2">
+                    ✨ Random Prompt
                   </Text>
-                  <ScrollView showsVerticalScrollIndicator={false}>
-                    <Text
-                      className="text-base leading-7 text-center"
-                      style={{ fontFamily: "serif", color: selectedTheme.text }}
-                    >
-                      {poem.content || ""}
-                    </Text>
-                  </ScrollView>
-                  <Text
-                    className="text-xs text-center mt-4"
-                    style={{ color: selectedTheme.text }}
-                  >
-                    Poem {index + 1} of {poems.length}
+                  <Text className="text-purple-700 italic">
+                    "{generateInspiration()}"
                   </Text>
                 </View>
-              </View>
-            ))}
-          </ScrollView>
-          <View className="absolute bottom-8 left-0 right-0 items-center">
-            <View className="bg-black/50 px-6 py-3 rounded-full">
-              <Text className="text-white font-bold">
-                {currentPage + 1} of {poems.length}
-              </Text>
+                <Text className="text-lg font-bold text-gray-900 dark:text-gray-50 mb-3">
+                  Explore Themes
+                </Text>
+                {writingThemes.map((theme, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    className="bg-light-100 dark:bg-slate-600 rounded-2xl p-4 mb-3"
+                    onPress={() => {
+                      setNewPoemTitle(`${theme.name}`);
+                      setShowInspirationModal(false);
+                      setShowAddModal(true);
+                    }}
+                  >
+                    <View className="flex-row items-center mb-2">
+                      <Text className="text-2xl mr-2">{theme.emoji}</Text>
+                      <Text className="text-base font-bold text-gray-900 dark:text-white">
+                        {theme.name}
+                      </Text>
+                    </View>
+                    <View className="flex-row flex-wrap gap-2">
+                      {theme.prompts.map((prompt, i) => (
+                        <View
+                          key={i}
+                          className="bg-white px-2 py-1 rounded-full"
+                        >
+                          <Text className="text-xs text-gray-600">
+                            {prompt}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  onPress={() => setShowInspirationModal(false)}
+                  className="bg-light-100 py-4 rounded-full mt-2"
+                >
+                  <Text className="text-gray-600 font-bold text-center">
+                    Close
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      
+        {/* Theme Modal */}
+        <Modal
+          visible={showThemeModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowThemeModal(false)}
+        >
+          <View className="flex-1 bg-black/90 justify-center items-center px-6">
+            <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md">
+              <Text className="text-2xl font-bold text-gray-900 mb-4 text-center">
+                🎨 Editor Theme
+              </Text>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {colorThemes.map((theme, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    onPress={() => {
+                      setSelectedTheme(theme);
+                      setWritingSetting({
+                        projectId: projectId,
+                        backgroundColor: theme.bg,
+                        textColor: theme.text,
+                      });
+                      setShowThemeModal(false);
+                    }}
+                    className="mb-3 rounded-2xl overflow-hidden border-2"
+                    style={{
+                      borderColor:
+                        selectedTheme.name === theme.name
+                          ? theme.accent
+                          : "#E5E7EB",
+                    }}
+                  >
+                    <View style={{ backgroundColor: theme.bg }} className="p-4">
+                      <Text
+                        style={{ color: theme.text }}
+                        className="font-bold text-lg mb-2"
+                      >
+                        {theme.name}
+                      </Text>
+                      <View className="flex-row gap-2">
+                        <View
+                          style={{ backgroundColor: theme.accent }}
+                          className="w-8 h-8 rounded-full"
+                        />
+                        <View
+                          style={{ backgroundColor: theme.text + "40" }}
+                          className="w-8 h-8 rounded-full"
+                        />
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  onPress={() => setShowThemeModal(false)}
+                  className="bg-light-100 py-4 rounded-full mt-2"
+                >
+                  <Text className="text-gray-600 font-bold text-center">
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Book Preview Modal */}
+        <Modal
+          visible={showBookPreview}
+          animationType="slide"
+          onRequestClose={() => setShowBookPreview(false)}
+        >
+          <View className="flex-1 bg-gray-900">
+            <View className="px-6 pt-16 pb-4 bg-black/50">
+              <View className="flex-row items-center justify-between">
+                <TouchableOpacity
+                  onPress={() => setShowBookPreview(false)}
+                  className="w-10 h-10 rounded-full bg-white/20 justify-center items-center"
+                >
+                  <Text className="text-xl text-white">✕</Text>
+                </TouchableOpacity>
+                <Text className="text-lg font-bold text-white">
+                  Poetry Preview
+                </Text>
+                <View className="w-10" />
+              </View>
+            </View>
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onScroll={(e) => {
+                setCurrentPage(
+                  Math.round(e.nativeEvent.contentOffset.x / width)
+                );
+              }}
+              scrollEventThrottle={16}
+            >
+              {poems.map((poem, index) => (
+                <View
+                  key={poem.id}
+                  className="px-8 py-12 justify-center"
+                  style={{
+                    width,
+                    backgroundColor: selectedTheme.text,
+                  }}
+                >
+                  <View
+                    className="bg-white rounded-2xl p-6 shadow-2xl"
+                    style={{
+                      height: width * 1.6,
+                      backgroundColor: selectedTheme.bg,
+                    }}
+                  >
+                    <Text
+                      className="text-xl font-bold mb-4 text-center"
+                      style={{ color: selectedTheme.text }}
+                    >
+                      {poem.name}
+                    </Text>
+                    <ScrollView showsVerticalScrollIndicator={false}>
+                      <Text
+                        className="text-base leading-7 text-center"
+                        style={{
+                          fontFamily: "serif",
+                          color: selectedTheme.text,
+                        }}
+                      >
+                        {poem.content || ""}
+                      </Text>
+                    </ScrollView>
+                    <Text
+                      className="text-xs text-center mt-4"
+                      style={{ color: selectedTheme.text }}
+                    >
+                      Poem {index + 1} of {poems.length}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+            <View className="absolute bottom-8 left-0 right-0 items-center">
+              <View className="bg-black/50 px-6 py-3 rounded-full">
+                <Text className="text-white font-bold">
+                  {currentPage + 1} of {poems.length}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </KeyboardAvoidingLayout>
     </Background>
   );
 };
