@@ -3,9 +3,18 @@
   <img src="./assets/images/transparent-bg.png" alt="QuilKalam Logo" width="300"/>
 </p>
 
-QuilKalam is a mobile application for writers and readers, providing an intuitive platform to write, organize, and share stories. Built with [Expo](https://expo.dev/), [React Native](https://reactnative.dev/), [NativeWind](https://www.nativewind.dev/), and [Tailwind CSS](https://tailwindcss.com/), it offers a modern, animated, and responsive user experience.
+## Getting Started
+### Download APK
+<p align="center">
+  <a href="./assets/releases/Quilkalam-v1.apk">
+    <img src="https://img.shields.io/badge/Download-APK-brightgreen.svg?logo=android" alt="Download APK"/>
+  </a>
+</p>
 
----
+Or a simple direct link:
+
+[Download APK](./assets/releases/Quilkalam-v1.apk)
+QuilKalam is a mobile application for writers and readers, providing an intuitive platform to write, organize, and share stories. Built with [Expo](https://expo.dev/), [React Native](https://reactnative.dev/), [NativeWind](https://www.nativewind.dev/), and [Tailwind CSS](https://tailwindcss.com/), it offers a modern, animated, and responsive user experience.
 
 ## Features
 
