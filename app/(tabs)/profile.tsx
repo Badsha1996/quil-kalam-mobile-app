@@ -869,7 +869,7 @@ const Profile = () => {
                   GlobalAlert.show({
                     title: "About QuillKalam",
                     message:
-                      "QuillKalam - Your Complete Writing Companion\n\nVersion 3.0\n\nCreate, organize, and publish your literary works with ease.",
+                      "QuillKalam - Your Complete Writing Companion\n\nVersion 1.0.0\n\nCreate, organize, and publish your literary works with ease.",
                     primaryText: "Okay",
                   })
                 }
