@@ -1,6 +1,6 @@
 # QuilKalam Mobile App
 <p align="center">
-  <img src="./assets/images/transparent-bg.png" alt="QuilKalam Logo" width="300"/>
+  <img src="./assets/images/quilkalam-logo.png" alt="QuilKalam Logo" width="300"/>
 </p>
 
 ## Getting Started
