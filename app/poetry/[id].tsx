@@ -7,6 +7,7 @@ import {
   prompts,
   writingThemes,
 } from "@/constants/poetryDetails";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   createFile,
@@ -434,6 +435,7 @@ const FORM_VALIDATORS: Record<
 // ==================== MAIN COMPONENT ====================
 const PoetryDetails = () => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams();
   const projectId = parseInt(id as string);
 
@@ -1391,7 +1393,7 @@ const PoetryDetails = () => {
                       className="bg-secondary px-6 py-3 rounded-full"
                     >
                       <Text className="text-gray-900 font-bold">
-                        ✨ Write Your First Poem
+                        Write Your First Poem
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -1411,17 +1413,21 @@ const PoetryDetails = () => {
           onRequestClose={() => setShowAddModal(false)}
         >
           <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            behavior={Platform.OS === "ios" ? "padding" : "padding"}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
             className="flex-1 justify-end bg-black/50"
           >
             <View
               className="bg-white dark:bg-dark-200 rounded-t-3xl p-6"
-              style={{ maxHeight: "95%" }}
+              style={{ maxHeight: "85%" }}
             >
               <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-4">
                 New Poem
               </Text>
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
                 <TextInput
                   value={newPoemTitle}
                   onChangeText={setNewPoemTitle}
@@ -1499,13 +1505,19 @@ const PoetryDetails = () => {
           visible={!!editingPoem}
           animationType="slide"
           onRequestClose={() => setEditingPoem(null)}
+          statusBarTranslucent={true}
         >
           <View
             className="flex-1"
-            style={{ backgroundColor: zenMode ? selectedTheme.bg : "#F9FAFB" }}
+            style={{
+              backgroundColor: zenMode ? selectedTheme.bg : "#F9FAFB",
+            }}
           >
             {!zenMode && (
-              <View className="px-6 pt-2 pb-3 border-b border-gray-200 bg-white dark:bg-dark-300">
+              <View
+                className="px-6 pb-3 border-b border-gray-200 bg-white dark:bg-dark-300"
+                style={{ paddingTop: insets.top + 8 }}
+              >
                 <View className="flex-row mt-2 items-center justify-between mb-3">
                   <TouchableOpacity
                     onPress={() => setEditingPoem(null)}
@@ -1588,7 +1600,8 @@ const PoetryDetails = () => {
             {zenMode && (
               <TouchableOpacity
                 onPress={() => setZenMode(false)}
-                className="absolute top-12 right-6 z-50 w-10 h-10 rounded-full bg-black/20 justify-center items-center"
+                className="absolute right-6 z-50 w-10 h-10 rounded-full bg-black/20 justify-center items-center"
+                style={{ top: insets.top + 8 }}
               >
                 <Text className="text-white text-lg">✕</Text>
               </TouchableOpacity>

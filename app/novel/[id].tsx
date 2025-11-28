@@ -58,11 +58,12 @@ import {
 } from "@/utils/api";
 import GlobalAlert from "@/components/common/GlobalAlert";
 import KeyboardAvoidingLayout from "@/components/common/KeyboardAvoidingLayout";
-
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 const { width, height } = Dimensions.get("window");
 
 const NovelDetails = () => {
   const { id } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
   const projectId = parseInt(id as string);
 
   const [project, setProject] = useState<any>(null);
@@ -2153,72 +2154,94 @@ const NovelDetails = () => {
     if (!isSelectionMode) return null;
 
     return (
-      <View className="absolute bottom-10 left-6 right-6 bg-white dark:bg-dark-200 rounded-2xl p-4 shadow-2xl border border-gray-200 dark:border-dark-100">
-        <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-base font-bold text-gray-900 dark:text-light-100">
-            {selectedItems.size} item(s) selected
-          </Text>
-          <TouchableOpacity
-            onPress={clearSelection}
-            className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-100 justify-center items-center"
-          >
-            <Text className="text-gray-600 dark:text-light-200">✕</Text>
-          </TouchableOpacity>
-        </View>
+      <Modal
+        visible={isSelectionMode}
+        transparent
+        animationType="fade"
+        onRequestClose={clearSelection}
+      >
+        <TouchableWithoutFeedback onPress={clearSelection}>
+          <View className="flex-1 bg-black/50 justify-end">
+            <TouchableWithoutFeedback>
+              <View className="bg-white dark:bg-dark-200 rounded-t-3xl p-6 pb-8 shadow-2xl">
+                {/* Header */}
+                <View className="flex-row items-center justify-between mb-4">
+                  <Text className="text-lg font-bold text-gray-900 dark:text-light-100">
+                    {selectedItems.size} selected
+                  </Text>
+                  <TouchableOpacity
+                    onPress={clearSelection}
+                    className="w-8 h-8 rounded-full bg-gray-100 dark:bg-dark-100 justify-center items-center"
+                  >
+                    <Text className="text-gray-600 dark:text-light-200">✕</Text>
+                  </TouchableOpacity>
+                </View>
 
-        <View className="flex-col gap-4">
-          <TouchableOpacity
-            onPress={handleCopyItems}
-            className="flex-1 bg-primary py-3 rounded-xl"
-          >
-            <Text className="text-white font-bold text-center text-sm">
-              Copy
-            </Text>
-          </TouchableOpacity>
+                {/* Primary Actions Row */}
+                <View className="flex-row gap-3 mb-3">
+                  <TouchableOpacity
+                    onPress={handleCopyItems}
+                    className="flex-1 bg-primary py-3.5 rounded-xl"
+                  >
+                    <Text className="text-white font-bold text-center text-sm">
+                      📋 Copy
+                    </Text>
+                  </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleMoveItems}
-            className="flex-1 bg-secondary py-3 rounded-xl"
-          >
-            <Text className="text-gray-900 dark:text-dark-300 font-bold text-center text-sm">
-              Move
-            </Text>
-          </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleMoveItems}
+                    className="flex-1 bg-blue-500 py-3.5 rounded-xl"
+                  >
+                    <Text className="text-white font-bold text-center text-sm">
+                      📁 Move
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
-          <TouchableOpacity
-            onPress={() => {
-              if (selectedItems.size === 1) {
-                const itemId = Array.from(selectedItems)[0];
-                const item = findItemById(items, itemId);
-                if (item) {
-                  handleRenameItem(item);
-                }
-              }
-            }}
-            className="flex-1 bg-light-100 dark:bg-dark-100 py-3 rounded-xl"
-            disabled={selectedItems.size !== 1}
-          >
-            <Text
-              className={`font-bold text-center text-sm ${
-                selectedItems.size === 1
-                  ? "text-gray-600 dark:text-light-200"
-                  : "text-gray-400 dark:text-dark-300"
-              }`}
-            >
-              Rename
-            </Text>
-          </TouchableOpacity>
+                {/* Secondary Actions Row */}
+                <View className="flex-row gap-3">
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (selectedItems.size === 1) {
+                        const itemId = Array.from(selectedItems)[0];
+                        const item = findItemById(items, itemId);
+                        if (item) {
+                          handleRenameItem(item);
+                        }
+                      }
+                    }}
+                    disabled={selectedItems.size !== 1}
+                    className={`flex-1 py-3.5 rounded-xl ${
+                      selectedItems.size === 1
+                        ? "bg-light-100 dark:bg-dark-100"
+                        : "bg-gray-200 dark:bg-gray-700 opacity-50"
+                    }`}
+                  >
+                    <Text
+                      className={`font-bold text-center text-sm ${
+                        selectedItems.size === 1
+                          ? "text-gray-600 dark:text-light-200"
+                          : "text-gray-400"
+                      }`}
+                    >
+                      ✏️ Rename
+                    </Text>
+                  </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={handleBulkDelete}
-            className="flex-1 bg-red-500 py-3 rounded-xl"
-          >
-            <Text className="text-white font-bold text-center text-sm">
-              Delete
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+                  <TouchableOpacity
+                    onPress={handleBulkDelete}
+                    className="flex-1 bg-red-500 py-3.5 rounded-xl"
+                  >
+                    <Text className="text-white font-bold text-center text-sm">
+                      🗑️ Delete
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     );
   };
 
@@ -2942,6 +2965,7 @@ const NovelDetails = () => {
           visible={!!editingItem}
           animationType="slide"
           onRequestClose={() => setEditingItem(null)}
+          statusBarTranslucent={true}
         >
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -2957,7 +2981,10 @@ const NovelDetails = () => {
               }}
             >
               {!zenMode && (
-                <View className="px-6 pt-4 pb-4 border-b border-gray-200 dark:border-dark-100 bg-white dark:bg-dark-300">
+                <View
+                  className="px-6 pb-4 border-b border-gray-200 dark:border-dark-100 bg-white dark:bg-dark-300"
+                  style={{ paddingTop: insets.top + 8 }}
+                >
                   <View className="flex-row items-center justify-between mb-4">
                     <TouchableOpacity
                       onPress={() => setEditingItem(null)}
@@ -3035,7 +3062,8 @@ const NovelDetails = () => {
               {zenMode && (
                 <TouchableOpacity
                   onPress={() => setZenMode(false)}
-                  className="absolute top-4 right-6 z-50 w-10 h-10 rounded-full bg-black/20 justify-center items-center"
+                  className="absolute right-6 z-50 w-10 h-10 rounded-full bg-black/20 justify-center items-center"
+                  style={{ top: insets.top + 8 }}
                 >
                   <Text className="text-white text-lg">✕</Text>
                 </TouchableOpacity>
