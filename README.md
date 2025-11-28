@@ -4,20 +4,32 @@
   <img src="./assets/images/quilkalam-logo.png" alt="QuilKalam Logo" width="300"/>
 </p>
 
-## Getting Started
-
-### Download APK
+<p align="center">
+  <strong>A modern, distraction-free writing platform for mobile</strong>
+</p>
 
 <p align="center">
-  <a href="https://play.google.com/apps/test/RQ3AyTU3HZg/ahAO29uNRZJdr7wAizQ4URGRj11jf0tCaShMYgEu4xXNtYtMVbJYe7RdqPbCfxllGdY5VVXVxHhnStjGhh3u7cqzc3">
-    <img src="https://img.shields.io/badge/Download-APK-brightgreen.svg?logo=android" alt="Download APK"/>
+  <a href="https://github.com/Badsha1996/quil-kalam-mobile-app/blob/main/LICENSE">
+    <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg">
+  </a>
+  <a href="https://github.com/Badsha1996/quil-kalam-mobile-app/releases">
+    <img alt="Release" src="https://img.shields.io/github/v/release/Badsha1996/quil-kalam-mobile-app?include_prereleases">
+  </a>
+  <a href="https://github.com/Badsha1996/quil-kalam-mobile-app/stargazers">
+    <img alt="Stars" src="https://img.shields.io/github/stars/Badsha1996/quil-kalam-mobile-app?style=social">
   </a>
 </p>
 
-Or a simple direct link:
+---
 
-[Download APK](https://play.google.com/apps/test/RQ3AyTU3HZg/ahAO29uNRZJdr7wAizQ4URGRj11jf0tCaShMYgEu4xXNtYtMVbJYe7RdqPbCfxllGdY5VVXVxHhnStjGhh3u7cqzc3)
-QuilKalam is a mobile application for writers and readers, providing an intuitive platform to write, organize, and share stories. Built with [Expo](https://expo.dev/), [React Native](https://reactnative.dev/), [NativeWind](https://www.nativewind.dev/), and [Tailwind CSS](https://tailwindcss.com/), it offers a modern, animated, and responsive user experience.
+## 📥 Downloads
+
+| Platform | Link |
+|----------|------|
+| **Google Play (Internal Testing)** | [![Download](https://img.shields.io/badge/Download-Internal%20Testing-blue?logo=google-play)](https://play.google.com/apps/test/RQ3AyTU3HZg/ahAO29uNRZJdr7wAizQ4URGRj11jf0tCaShMYgEu4xXNtYtMVbJYe7RdqPbCfxllGdY5VVXVxHhnStjGhh3u7cqzc3) |
+| **Latest Release APK** | [![Download](https://img.shields.io/badge/Download-APK-brightgreen?logo=android)](https://github.com/Badsha1996/quil-kalam-mobile-app/releases/download/apk/Quilkalam-v1.apk) |
+
+> QuilKalam is a cross-platform mobile application built with **Expo**, **React Native**, **NativeWind**, and **Tailwind CSS**. It provides writers and readers with an intuitive, modern platform to write, organize, and share stories with beautiful animations and responsive design.
 
 ## Features
 
