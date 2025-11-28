@@ -1677,9 +1677,13 @@ const PoetryDetails = () => {
             setSearchResults([]);
             setSelectedPoem(null);
           }}
+          statusBarTranslucent={true}
         >
-          <View className="flex-1 bg-white dark:bg-dark-300">
-            <View className="px-6 pt-4 pb-4 bg-primary">
+          <View className="flex-1 h-screen bg-white dark:bg-dark-300">
+            <View
+              className="px-6 pt-4 pb-4 bg-primary"
+              style={{ top: insets.top + 8 }}
+            >
               <View className="flex-row items-center justify-between mb-4">
                 <TouchableOpacity
                   onPress={() => {
@@ -1764,7 +1768,7 @@ const PoetryDetails = () => {
             </View>
 
             {/* Content Area with FlatList */}
-            <View className="flex-1 px-6">
+            <View className="flex-1 px-6 mt-12">
               {isSearching ? (
                 <View className="flex-1 justify-center items-center py-12">
                   <Text className="text-4xl mb-3">📖</Text>
