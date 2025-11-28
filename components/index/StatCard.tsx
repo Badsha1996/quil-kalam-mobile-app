@@ -11,6 +11,7 @@ type StatCardProps = {
 const StatCard = ({ number, label, color, delay }: StatCardProps) => {
   const scaleAnim = useRef(new Animated.Value(0)).current;
 
+  // ************************************ EFFECTS **********************************
   useEffect(() => {
     Animated.spring(scaleAnim, {
       toValue: 1,

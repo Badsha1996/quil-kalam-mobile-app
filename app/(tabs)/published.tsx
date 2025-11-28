@@ -1,6 +1,5 @@
 import Background from "@/components/common/Background";
 import { PublishedProject } from "@/types/published";
-// @ts-ignore
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -14,7 +13,17 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  RefreshControl,
 } from "react-native";
+import {
+  getPublishedProjects,
+  unpublishProject,
+  getPublishedProjectItems,
+  trackProjectView,
+  likeProject,
+  unlikeProject,
+  isAuthenticated,
+} from "@/utils/api";
 
 const { width } = Dimensions.get("window");
 
@@ -25,6 +34,7 @@ const PublishedWorks = () => {
     []
   );
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"recent" | "popular" | "trending">(
@@ -35,6 +45,8 @@ const PublishedWorks = () => {
   const [showReader, setShowReader] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const [bookContent, setBookContent] = useState<any[]>([]);
+  const [isLiked, setIsLiked] = useState(false);
+  const [upcoming, setUpcoming] = useState(true);
 
   useEffect(() => {
     loadPublishedWorks();
@@ -46,33 +58,62 @@ const PublishedWorks = () => {
 
   const loadPublishedWorks = async () => {
     try {
-    } catch (error) {
+      setLoading(true);
+
+      // Call API without filters to avoid parameter binding issues
+      const response = await getPublishedProjects();
+
+      // Handle different response formats
+      if (response?.success && response?.projects) {
+        setProjects(response.projects);
+      } else if (response?.projects) {
+        setProjects(response.projects);
+      } else if (Array.isArray(response)) {
+        setProjects(response);
+      } else {
+        console.warn("Unexpected response format:", response);
+        setProjects([]);
+      }
+    } catch (error: any) {
       console.error("Error loading published works:", error);
-      Alert.alert("Error", "Failed to load published works");
+
+      // Only show alert if not initial load and not a refresh
+      if (!loading && !refreshing) {
+        Alert.alert(
+          "Error",
+          error?.message || "Failed to load published works. Please try again."
+        );
+      }
+
+      // Set empty array on error
+      setProjects([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadPublishedWorks();
+    setRefreshing(false);
+  };
+
   const applyFilters = () => {
     let filtered = [...projects];
 
-    // Search filter
     if (searchQuery.trim()) {
       filtered = filtered.filter(
         (p) =>
-          p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           p.author_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           p.description?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
-    // Genre filter
     if (selectedGenre) {
       filtered = filtered.filter((p) => p.genre === selectedGenre);
     }
 
-    // Sort
     filtered.sort((a, b) => {
       switch (sortBy) {
         case "popular":
@@ -93,23 +134,83 @@ const PublishedWorks = () => {
 
   const handleProjectClick = async (project: PublishedProject) => {
     setSelectedProject(project);
+    setIsLiked(false); // Reset like state
+
+    // Track view
+    try {
+      await trackProjectView(project.id);
+    } catch (error) {
+      console.error("Error tracking view:", error);
+    }
   };
 
   const handleReadBook = async () => {
     if (!selectedProject) return;
 
     try {
+      setLoading(true);
+      const response = await getPublishedProjectItems(selectedProject.id);
+
+      if (response.success && response.items) {
+        setBookContent(response.items);
+        setShowReader(true);
+        setCurrentPage(0);
+      }
     } catch (error) {
       console.error("Error loading book content:", error);
       Alert.alert("Error", "Failed to load book content");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleLike = async (projectId: string) => {
-    // TODO: Implement like functionality with user authentication
+    if (!isAuthenticated()) {
+      Alert.alert("Sign In Required", "Please sign in to like projects");
+      return;
+    }
+
+    try {
+      if (isLiked) {
+        await unlikeProject(projectId);
+        setIsLiked(false);
+        Alert.alert("Success", "Removed from favorites");
+      } else {
+        await likeProject(projectId);
+        setIsLiked(true);
+        Alert.alert("Success", "Added to favorites!");
+      }
+
+      // Refresh to get updated counts
+      await loadPublishedWorks();
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      Alert.alert("Error", "Failed to update favorite status");
+    }
+  };
+
+  const handleDelete = async (projectId: string) => {
     Alert.alert(
-      "Coming Soon",
-      "Like feature will be available when you sign in!"
+      "Delete Project",
+      "Are you sure you want to unpublish this project? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await unpublishProject(projectId);
+              Alert.alert("Success", "Project unpublished successfully");
+              setSelectedProject(null);
+              await loadPublishedWorks();
+            } catch (error) {
+              console.error("Error deleting project:", error);
+              Alert.alert("Error", "Failed to unpublish project");
+            }
+          },
+        },
+      ]
     );
   };
 
@@ -117,7 +218,7 @@ const PublishedWorks = () => {
     new Set(projects.map((p) => p.genre).filter(Boolean))
   );
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <Background>
         <View className="flex-1 justify-center items-center">
@@ -130,12 +231,32 @@ const PublishedWorks = () => {
     );
   }
 
+  if (upcoming) {
+    return (
+      <Background>
+        <View className="flex-1 justify-center items-center">
+          {/* <ActivityIndicator size="large" color="#FF6B9D" /> */}
+          <Text className="text-gray-600 dark:text-light-200 mt-4">
+            This is an upcoming feature 😩
+          </Text>
+        </View>
+      </Background>
+    );
+  }
+
   return (
     <Background>
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={["#FF6B9D"]}
+          />
+        }
       >
         {/* Header */}
         <View className="px-6 pt-16 pb-6">
@@ -323,7 +444,9 @@ const PublishedWorks = () => {
                 No works found
               </Text>
               <Text className="text-sm text-gray-600 dark:text-light-200 text-center px-8">
-                Try adjusting your search or filters
+                {searchQuery || selectedGenre
+                  ? "Try adjusting your search or filters"
+                  : "Be the first to publish a work!"}
               </Text>
             </View>
           )}
@@ -374,13 +497,13 @@ const PublishedWorks = () => {
                   <View className="flex-row items-center gap-2">
                     <Text className="text-xl">👁️</Text>
                     <Text className="text-sm font-semibold text-gray-900 dark:text-light-100">
-                      {selectedProject?.view_count || 0} views
+                      {selectedProject?.view_count || 0}
                     </Text>
                   </View>
                   <View className="flex-row items-center gap-2">
                     <Text className="text-xl">❤️</Text>
                     <Text className="text-sm font-semibold text-gray-900 dark:text-light-100">
-                      {selectedProject?.like_count || 0} likes
+                      {selectedProject?.like_count || 0}
                     </Text>
                   </View>
                   <View className="flex-row items-center gap-2">
@@ -411,7 +534,7 @@ const PublishedWorks = () => {
                   </View>
                 )}
 
-                <View className="flex-row gap-3">
+                <View className="flex-row gap-3 mb-4">
                   <TouchableOpacity
                     onPress={handleReadBook}
                     className="flex-1 bg-primary py-4 rounded-full"
@@ -422,15 +545,29 @@ const PublishedWorks = () => {
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => handleLike(selectedProject?.id || "")}
-                    className="bg-secondary px-6 py-4 rounded-full"
+                    className={`px-6 py-4 rounded-full ${
+                      isLiked ? "bg-red-100" : "bg-secondary"
+                    }`}
                   >
-                    <Text className="text-2xl">❤️</Text>
+                    <Text className="text-2xl">{isLiked ? "💗" : "❤️"}</Text>
                   </TouchableOpacity>
                 </View>
 
+                {/* Delete Button - Only show if authenticated */}
+                {isAuthenticated() && (
+                  <TouchableOpacity
+                    onPress={() => handleDelete(selectedProject?.id || "")}
+                    className="bg-red-50 dark:bg-red-900/20 py-3 rounded-full mb-2"
+                  >
+                    <Text className="text-red-600 dark:text-red-400 font-semibold text-center">
+                      🗑️ Unpublish Project
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
                 <TouchableOpacity
                   onPress={() => setSelectedProject(null)}
-                  className="mt-4 py-3"
+                  className="py-3"
                 >
                   <Text className="text-gray-600 dark:text-light-200 font-semibold text-center">
                     Close
@@ -442,18 +579,24 @@ const PublishedWorks = () => {
         </View>
       </Modal>
 
-      {/* Book Reader Modal with Page Flip */}
+      {/* Book Reader Modal */}
       <Modal
         visible={showReader}
         animationType="slide"
-        onRequestClose={() => setShowReader(false)}
+        onRequestClose={() => {
+          setShowReader(false);
+          setCurrentPage(0);
+        }}
       >
         <View className="flex-1 bg-gray-900">
           {/* Reader Header */}
           <View className="px-6 pt-16 pb-4 bg-black/50">
             <View className="flex-row items-center justify-between">
               <TouchableOpacity
-                onPress={() => setShowReader(false)}
+                onPress={() => {
+                  setShowReader(false);
+                  setCurrentPage(0);
+                }}
                 className="w-10 h-10 rounded-full bg-white/20 justify-center items-center"
               >
                 <Text className="text-xl text-white">←</Text>
@@ -469,9 +612,7 @@ const PublishedWorks = () => {
                   by {selectedProject?.author_name}
                 </Text>
               </View>
-              <TouchableOpacity className="w-10 h-10 rounded-full bg-white/20 justify-center items-center">
-                <Text className="text-xl text-white">⋮</Text>
-              </TouchableOpacity>
+              <View className="w-10" />
             </View>
           </View>
 

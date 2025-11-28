@@ -1,6 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://your-api.com';
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL || "https://quilkalam-backend.vercel.app/api";
 
 // ==================== AUTH HELPERS ====================
 
@@ -8,28 +9,47 @@ let authToken: string | null = null;
 let userId: string | null = null;
 
 export const initAuth = async () => {
-  authToken = await AsyncStorage.getItem('auth_token');
-  userId = await AsyncStorage.getItem('user_id');
+  try {
+    const values = await AsyncStorage.multiGet(["auth_token", "user_id"]);
+    authToken = values[0][1];
+    userId = values[1][1];
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error initializing auth:", error);
+    authToken = null;
+    userId = null;
+    throw error;
+  }
 };
 
 const saveAuth = async (token: string, id: string) => {
-  await AsyncStorage.multiSet([
-    ['auth_token', token],
-    ['user_id', id],
-  ]);
-  authToken = token;
-  userId = id;
+  try {
+    await AsyncStorage.multiSet([
+      ["auth_token", token],
+      ["user_id", id],
+    ]);
+    authToken = token;
+    userId = id;
+  } catch (error) {
+    console.error("Error saving auth:", error);
+    throw error;
+  }
 };
 
 export const clearAuth = async () => {
-  await AsyncStorage.multiRemove(['auth_token', 'user_id']);
-  authToken = null;
-  userId = null;
+  try {
+    await AsyncStorage.multiRemove(["auth_token", "user_id"]);
+    authToken = null;
+    userId = null;
+  } catch (error) {
+    console.error("Error clearing auth:", error);
+  }
 };
 
 export const getAuthHeaders = () => ({
-  'Content-Type': 'application/json',
-  'Authorization': authToken ? `Bearer ${authToken}` : '',
+  "Content-Type": "application/json",
+  Authorization: authToken ? `Bearer ${authToken}` : "",
 });
 
 export const getCurrentUserId = () => userId;
@@ -45,21 +65,27 @@ export const registerUser = async (
 ) => {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phoneNumber, password, displayName }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Registration failed');
+      throw new Error(data.error || data.message || "Registration failed");
     }
 
-    const data = await response.json();
-    await saveAuth(data.token, data.user.id);
+    if (data.token && data.user) {
+      await saveAuth(data.token, data.user.id);
+    }
+
     return data.user;
-  } catch (error) {
-    console.error('Registration error:', error);
+  } catch (error: any) {
+    // Return more specific error messages
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
+    }
     throw error;
   }
 };
@@ -67,21 +93,28 @@ export const registerUser = async (
 export const loginUser = async (phoneNumber: string, password: string) => {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phoneNumber, password }),
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Login failed');
+      throw new Error(data.error || data.message || "Login failed");
     }
 
-    const data = await response.json();
-    await saveAuth(data.token, data.user.id);
+    if (data.token && data.user) {
+      await saveAuth(data.token, data.user.id);
+    }
+
     return data.user;
-  } catch (error) {
-    console.error('Login error:', error);
+  } catch (error: any) {
+    console.error("Login error:", error);
+    // Return more specific error messages
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
+    }
     throw error;
   }
 };
@@ -97,39 +130,51 @@ export const updateUserProfile = async (updates: {
   profileImage?: string;
 }) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/users/profile`, {
-      method: 'PATCH',
+    const response = await fetch(`${API_BASE_URL}/user/profile`, {
+      method: "PUT",
       headers: getAuthHeaders(),
       body: JSON.stringify(updates),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to update profile');
+      const error = await response.json();
+      throw new Error(
+        error.error || error.message || "Failed to update profile"
+      );
     }
 
-    return await response.json();
-  } catch (error) {
-    console.error('Profile update error:', error);
+    const data = await response.json();
+    return data.user;
+  } catch (error: any) {
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
+    }
     throw error;
   }
 };
 
-export const changePassword = async (oldPassword: string, newPassword: string) => {
+export const changePassword = async (
+  oldPassword: string,
+  newPassword: string
+) => {
   try {
     const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
-      method: 'POST',
+      method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ oldPassword, newPassword }),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Password change failed');
+      throw new Error(error.error || error.message || "Password change failed");
     }
 
     return await response.json();
-  } catch (error) {
-    console.error('Password change error:', error);
+  } catch (error: any) {
+    console.error("Password change error:", error);
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
+    }
     throw error;
   }
 };
@@ -138,78 +183,149 @@ export const changePassword = async (oldPassword: string, newPassword: string) =
 
 export const publishProject = async (projectData: {
   localProjectId: number;
-  project: any;
+  type: string;
+  title: string;
+  description?: string;
+  genre?: string;
+  authorName?: string;
+  coverImage?: string;
+  backImage?: string; // Changed from backCoverImage to backImage
+  wordCount: number;
   items: any[];
   settings?: any;
 }) => {
   try {
     if (!isAuthenticated()) {
-      throw new Error('User not authenticated');
+      throw new Error("User not authenticated");
     }
 
-    const response = await fetch(`${API_BASE_URL}/projects/publish`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        ...projectData,
-        userId: getCurrentUserId(),
+    // Filter only chapters/documents, exclude folders and other item types
+    const chapterItems = projectData.items.filter(
+      (item) => item.itemType === "document" || item.itemType === "chapter"
+    );
+
+    const payload = {
+      type: projectData.type,
+      title: projectData.title,
+      description: projectData.description,
+      genre: projectData.genre,
+      authorName: projectData.authorName,
+      coverImage: projectData.coverImage,
+      backImage: projectData.backImage, // Changed to match backend
+      wordCount: projectData.wordCount,
+      isbn: projectData.settings?.isbn,
+      publisher: projectData.settings?.publisher,
+      publicationDate: projectData.settings?.publication_date,
+      price: projectData.settings?.price,
+      language: projectData.settings?.language || "en",
+      copyrightText: projectData.settings?.copyright_text,
+      categories: projectData.settings?.categories?.split(",") || [],
+      tags: projectData.settings?.tags?.split(",") || [],
+      isPublic: projectData.settings?.is_public ?? true,
+      allowComments: projectData.settings?.allow_comments ?? true,
+      allowDownloads: projectData.settings?.allow_downloads ?? false,
+      items: chapterItems.map((item) => {
+        const parentItemId = item.parent_item_id
+          ? String(item.parent_item_id)
+          : "";
+
+        const itemType = item.item_type || "document";
+
+        let parsedMetadata = null;
+        if (item.metadata) {
+          try {
+            parsedMetadata =
+              typeof item.metadata === "string"
+                ? JSON.parse(item.metadata)
+                : item.metadata;
+          } catch (e) {
+            console.warn("Failed to parse metadata:", e);
+            parsedMetadata = null;
+          }
+        }
+
+        return {
+          parentItemId: parentItemId,
+          itemType: itemType,
+          name: item.name || "",
+          description: item.description || "",
+          content: item.content || "",
+          metadata: parsedMetadata,
+          orderIndex: item.order_index || 0,
+          depthLevel: item.depth_level || 0,
+          wordCount: item.word_count || 0,
+        };
       }),
+    };
+
+    console.log("Publishing payload:", {
+      ...payload,
+      coverImage: payload.coverImage
+        ? `base64 (${payload.coverImage.length} chars)`
+        : null,
+      backImage: payload.backImage
+        ? `base64 (${payload.backImage.length} chars)`
+        : null,
     });
 
+    const response = await fetch(`${API_BASE_URL}/projects/publish`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to publish project');
+      throw new Error(
+        data.error || data.message || "Failed to publish project"
+      );
     }
 
-    return await response.json();
-  } catch (error) {
-    console.error('Publish error:', error);
+    if (data.success && data.projectId) {
+      return data;
+    } else {
+      throw new Error("Invalid response format from server");
+    }
+  } catch (error: any) {
+    console.error("Publish error:", error);
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
+    }
     throw error;
   }
 };
 
 export const unpublishProject = async (publishedProjectId: string) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/projects/${publishedProjectId}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/projects/${publishedProjectId}`,
+      {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      }
+    );
 
     if (!response.ok) {
-      throw new Error('Failed to unpublish project');
+      const error = await response.json();
+      throw new Error(
+        error.error || error.message || "Failed to unpublish project"
+      );
     }
 
     return await response.json();
-  } catch (error) {
-    console.error('Unpublish error:', error);
-    throw error;
-  }
-};
-
-export const updatePublishedProject = async (
-  publishedProjectId: string,
-  updates: any
-) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/projects/${publishedProjectId}`, {
-      method: 'PATCH',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(updates),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to update project');
+  } catch (error: any) {
+    console.error("Unpublish error:", error);
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
     }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Update error:', error);
     throw error;
   }
 };
 
 // ==================== BROWSE PUBLISHED WORKS ====================
 
+// Replace this function in your api.ts file
 export const getPublishedProjects = async (filters?: {
   genre?: string;
   type?: string;
@@ -217,63 +333,82 @@ export const getPublishedProjects = async (filters?: {
   userId?: string;
   page?: number;
   limit?: number;
-  sortBy?: 'recent' | 'popular' | 'trending';
+  sortBy?: "recent" | "popular" | "trending";
 }) => {
   try {
     const params = new URLSearchParams();
-    if (filters?.genre) params.append('genre', filters.genre);
-    if (filters?.type) params.append('type', filters.type);
-    if (filters?.search) params.append('search', filters.search);
-    if (filters?.userId) params.append('userId', filters.userId);
-    if (filters?.page) params.append('page', filters.page.toString());
-    if (filters?.limit) params.append('limit', filters.limit.toString());
-    if (filters?.sortBy) params.append('sortBy', filters.sortBy);
 
-    const response = await fetch(`${API_BASE_URL}/projects?${params}`, {
+    // Only add parameters if they exist and have values
+    if (filters?.genre) params.append("genre", filters.genre);
+    if (filters?.type) params.append("type", filters.type);
+    if (filters?.search) params.append("search", filters.search);
+    if (filters?.userId) params.append("userId", filters.userId);
+    if (filters?.page) params.append("page", filters.page.toString());
+    if (filters?.limit) params.append("limit", filters.limit.toString());
+    if (filters?.sortBy) params.append("sortBy", filters.sortBy);
+
+    const queryString = params.toString();
+    const url = queryString
+      ? `${API_BASE_URL}/projects?${queryString}`
+      : `${API_BASE_URL}/projects`;
+
+    const response = await fetch(url, {
       headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch projects');
+      const error = await response.json();
+      throw new Error(
+        error.error || error.message || "Failed to fetch projects"
+      );
     }
 
     return await response.json();
-  } catch (error) {
-    console.error('Fetch projects error:', error);
+  } catch (error: any) {
+    console.error("Fetch projects error:", error);
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
+    }
     throw error;
   }
 };
 
-export const getPublishedProject = async (projectId: string) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
-      headers: getAuthHeaders(),
-    });
+// ==================== CHAPTER OPERATIONS ====================
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch project');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Fetch project error:', error);
-    throw error;
+export const addChapter = async (
+  projectId: string,
+  chapterData: {
+    name: string;
+    content: string;
+    description?: string;
+    orderIndex: number;
+    parentItemId?: string;
   }
-};
-
-export const getPublishedProjectItems = async (projectId: string) => {
+) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/projects/${projectId}/items`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/projects/${projectId}/chapters`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          ...chapterData,
+          itemType: "chapter",
+        }),
+      }
+    );
 
     if (!response.ok) {
-      throw new Error('Failed to fetch project items');
+      const error = await response.json();
+      throw new Error(error.error || error.message || "Failed to add chapter");
     }
 
     return await response.json();
-  } catch (error) {
-    console.error('Fetch items error:', error);
+  } catch (error: any) {
+    console.error("Add chapter error:", error);
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
+    }
     throw error;
   }
 };
@@ -282,110 +417,50 @@ export const getPublishedProjectItems = async (projectId: string) => {
 
 export const likeProject = async (projectId: string) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/projects/${projectId}/like`, {
-      method: 'POST',
+    const response = await fetch(`${API_BASE_URL}/likes`, {
+      method: "POST",
       headers: getAuthHeaders(),
+      body: JSON.stringify({ projectId }),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to like project');
+      const error = await response.json();
+      throw new Error(error.error || error.message || "Failed to like project");
     }
 
     return await response.json();
-  } catch (error) {
-    console.error('Like error:', error);
+  } catch (error: any) {
+    console.error("Like error:", error);
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
+    }
     throw error;
   }
 };
 
-export const unlikeProject = async (projectId: string) => {
+export const addComment = async (
+  projectId: string,
+  content: string,
+  parentCommentId?: string
+) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/projects/${projectId}/like`, {
-      method: 'DELETE',
+    const response = await fetch(`${API_BASE_URL}/comments`, {
+      method: "POST",
       headers: getAuthHeaders(),
+      body: JSON.stringify({ projectId, content, parentCommentId }),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to unlike project');
+      const error = await response.json();
+      throw new Error(error.error || error.message || "Failed to add comment");
     }
 
     return await response.json();
-  } catch (error) {
-    console.error('Unlike error:', error);
-    throw error;
-  }
-};
-
-export const addComment = async (projectId: string, content: string, parentCommentId?: string) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/projects/${projectId}/comments`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ content, parentCommentId }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to add comment');
+  } catch (error: any) {
+    console.error("Comment error:", error);
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
     }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Comment error:', error);
-    throw error;
-  }
-};
-
-export const getComments = async (projectId: string, page = 1, limit = 20) => {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/projects/${projectId}/comments?page=${page}&limit=${limit}`,
-      { headers: getAuthHeaders() }
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch comments');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Fetch comments error:', error);
-    throw error;
-  }
-};
-
-export const deleteComment = async (commentId: string) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/comments/${commentId}`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to delete comment');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Delete comment error:', error);
-    throw error;
-  }
-};
-
-export const updateComment = async (commentId: string, content: string) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/comments/${commentId}`, {
-      method: 'PATCH',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ content }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to update comment');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Update comment error:', error);
     throw error;
   }
 };
@@ -394,89 +469,23 @@ export const updateComment = async (commentId: string, content: string) => {
 
 export const followUser = async (followingId: string) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/users/${followingId}/follow`, {
-      method: 'POST',
+    const response = await fetch(`${API_BASE_URL}/follows`, {
+      method: "POST",
       headers: getAuthHeaders(),
+      body: JSON.stringify({ followingId }),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to follow user');
+      const error = await response.json();
+      throw new Error(error.error || error.message || "Failed to follow user");
     }
 
     return await response.json();
-  } catch (error) {
-    console.error('Follow error:', error);
-    throw error;
-  }
-};
-
-export const unfollowUser = async (followingId: string) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/users/${followingId}/follow`, {
-      method: 'DELETE',
-      headers: getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to unfollow user');
+  } catch (error: any) {
+    console.error("Follow error:", error);
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
     }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Unfollow error:', error);
-    throw error;
-  }
-};
-
-export const getUserProfile = async (userId: string) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-      headers: getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch user profile');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Fetch profile error:', error);
-    throw error;
-  }
-};
-
-export const getUserFollowers = async (userId: string, page = 1, limit = 20) => {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/users/${userId}/followers?page=${page}&limit=${limit}`,
-      { headers: getAuthHeaders() }
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch followers');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Fetch followers error:', error);
-    throw error;
-  }
-};
-
-export const getUserFollowing = async (userId: string, page = 1, limit = 20) => {
-  try {
-    const response = await fetch(
-      `${API_BASE_URL}/users/${userId}/following?page=${page}&limit=${limit}`,
-      { headers: getAuthHeaders() }
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch following');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Fetch following error:', error);
     throw error;
   }
 };
@@ -485,23 +494,502 @@ export const getUserFollowing = async (userId: string, page = 1, limit = 20) => 
 
 export const updateReadingProgress = async (
   projectId: string,
-  itemId: string,
+  lastReadItemId: string,
   progressPercentage: number
 ) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/reading/progress`, {
-      method: 'POST',
+    const response = await fetch(`${API_BASE_URL}/reading-progress`, {
+      method: "POST",
       headers: getAuthHeaders(),
-      body: JSON.stringify({ projectId, itemId, progressPercentage }),
+      body: JSON.stringify({ projectId, lastReadItemId, progressPercentage }),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to update reading progress');
+      const error = await response.json();
+      throw new Error(
+        error.error || error.message || "Failed to update reading progress"
+      );
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    console.error("Update progress error:", error);
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
+    }
+    throw error;
+  }
+};
+
+// ==================== FILE UPLOAD ====================
+// @ts-ignore
+import * as FileSystem from "expo-file-system";
+
+export const convertImageToBase64 = async (
+  imageUri: string
+): Promise<string> => {
+  try {
+    console.log("Converting image to base64:", imageUri);
+
+    // Check if the URI is already a base64 data URL
+    if (imageUri.startsWith("data:")) {
+      console.log("Image is already base64, returning as-is");
+      return imageUri;
+    }
+
+    // For file:// URIs, read the file and convert to base64
+    if (imageUri.startsWith("file://")) {
+      console.log("Reading file from filesystem...");
+      const base64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Determine MIME type from file extension
+      let mimeType = "image/jpeg"; // default
+      if (imageUri.toLowerCase().endsWith(".png")) {
+        mimeType = "image/png";
+      } else if (imageUri.toLowerCase().endsWith(".gif")) {
+        mimeType = "image/gif";
+      } else if (imageUri.toLowerCase().endsWith(".webp")) {
+        mimeType = "image/webp";
+      }
+
+      const dataUrl = `data:${mimeType};base64,${base64}`;
+      console.log(
+        "Successfully converted image to base64, length:",
+        dataUrl.length
+      );
+      return dataUrl;
+    }
+
+    // For other URI types (http, https, etc.), try to fetch and convert
+    console.log("Fetching image from URL...");
+    const response = await fetch(imageUri);
+    const blob = await response.blob();
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === "string") {
+          console.log(
+            "Successfully converted URL image to base64, length:",
+            reader.result.length
+          );
+          resolve(reader.result);
+        } else {
+          reject(new Error("Failed to convert image to base64"));
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error("Error converting image to base64:", error);
+    throw new Error(`Failed to convert image: ${error}`);
+  }
+};
+
+export const uploadImage = async (
+  imageUri: string,
+  type: "profile" | "cover" | "content"
+) => {
+  try {
+    const base64 = await convertImageToBase64(imageUri);
+
+    const response = await fetch(`${API_BASE_URL}/upload/image`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        image: base64,
+        folder: `quilkalam/${type}s`,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || error.message || "Image upload failed");
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    console.error("Upload error:", error);
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
+    }
+    throw error;
+  }
+};
+
+// ==================== PROJECT PUBLISHING ====================
+
+export const updatePublishedProject = async (
+  publishedProjectId: string,
+  updates: any
+) => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/projects/${publishedProjectId}`,
+      {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(updates),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(
+        error.error || error.message || "Failed to update project"
+      );
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    console.error("Update error:", error);
+    if (error.message.includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
+    }
+    throw error;
+  }
+};
+
+// ==================== BROWSE PUBLISHED WORKS ====================
+
+export const getPublishedProject = async (projectId: string) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch project");
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Update progress error:', error);
+    console.error("Fetch project error:", error);
+    throw error;
+  }
+};
+
+export const getPublishedProjectItems = async (projectId: string) => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/projects/${projectId}/chapters`,
+      {
+        headers: getAuthHeaders(),
+      }
+    );
+
+    console.log(response)
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("Server response:", response.status, text);
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Fetch items error:", error);
+    throw error;
+  }
+};
+
+// ==================== ENGAGEMENT ====================
+
+export const updateChapter = async (
+  projectId: string,
+  chapterId: string,
+  updates: {
+    name?: string;
+    content?: string;
+    description?: string;
+    orderIndex?: number;
+  }
+) => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/projects/${projectId}/chapters/${chapterId}`,
+      {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(updates),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to update chapter");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Update chapter error:", error);
+    throw error;
+  }
+};
+
+export const updateAllChapter = async (
+  publishedProjectId: string,
+  chapterUpdates: any
+) => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/projects/${publishedProjectId}/chapters/batch`,
+      {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          updates: chapterUpdates,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to update chapters");
+    }
+
+    const result = await response.json();
+
+    return result;
+  } catch (error) {
+    console.error("Update chapter error:", error);
+    throw error;
+  }
+};
+
+export const deleteChapter = async (projectId: string, chapterId: string) => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/projects/${projectId}/chapters/${chapterId}`,
+      {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Failed to delete chapter");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Delete chapter error:", error);
+    throw error;
+  }
+};
+
+export const getChapters = async (projectId: string) => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/projects/${projectId}/chapters`,
+      {
+        headers: getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch chapters");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Fetch chapters error:", error);
+    throw error;
+  }
+};
+
+export const unlikeProject = async (projectId: string) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/likes`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ projectId }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to unlike project");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Unlike error:", error);
+    throw error;
+  }
+};
+
+export const getComments = async (projectId: string, page = 1, limit = 20) => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/comments?projectId=${projectId}`, // Changed endpoint and params
+      { headers: getAuthHeaders() }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch comments");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Fetch comments error:", error);
+    throw error;
+  }
+};
+
+export const deleteComment = async (commentId: string) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/comments?id=${commentId}`, {
+      // Changed to query param
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to delete comment");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Delete comment error:", error);
+    throw error;
+  }
+};
+
+export const updateComment = async (commentId: string, content: string) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/comments/${commentId}`, {
+      method: "PATCH",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ content }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to update comment");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Update comment error:", error);
+    throw error;
+  }
+};
+
+// ==================== SOCIAL FEATURES ====================
+
+export const unfollowUser = async (followingId: string) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/follows`, {
+      // Same endpoint, toggles
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ followingId }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to unfollow user");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Unfollow error:", error);
+    throw error;
+  }
+};
+
+export const getUserProfile = async (userId: string) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/user/profile`, {
+      method: "GET",
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.error ||
+          errorData.message ||
+          `HTTP ${response.status}: Failed to fetch user profile`
+      );
+    }
+
+    const data = await response.json();
+
+    return data.user;
+  } catch (error: any) {
+    if (error.message.includes("fetch") || error.message.includes("Network")) {
+      return {};
+    }
+
+    // Re-throw other errors
+    throw error;
+  }
+};
+
+export const getUserFollowers = async (
+  userId: string,
+  page = 1,
+  limit = 20
+) => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/users/${userId}/followers?page=${page}&limit=${limit}`,
+      { headers: getAuthHeaders() }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch followers");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Fetch followers error:", error);
+    throw error;
+  }
+};
+
+export const getUserFollowing = async (
+  userId: string,
+  page = 1,
+  limit = 20
+) => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/users/${userId}/following?page=${page}&limit=${limit}`,
+      { headers: getAuthHeaders() }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch following");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Fetch following error:", error);
+    throw error;
+  }
+};
+
+// ==================== READING HISTORY ====================
+
+export const getReadingProgress = async (projectId: string) => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/reading-progress?projectId=${projectId}`,
+      {
+        headers: getAuthHeaders(),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch reading progress");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Fetch progress error:", error);
     throw error;
   }
 };
@@ -514,29 +1002,12 @@ export const getReadingHistory = async (page = 1, limit = 20) => {
     );
 
     if (!response.ok) {
-      throw new Error('Failed to fetch reading history');
+      throw new Error("Failed to fetch reading history");
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Fetch history error:', error);
-    throw error;
-  }
-};
-
-export const getReadingProgress = async (projectId: string) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/reading/progress/${projectId}`, {
-      headers: getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch reading progress');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Fetch progress error:', error);
+    console.error("Fetch history error:", error);
     throw error;
   }
 };
@@ -546,73 +1017,82 @@ export const getReadingProgress = async (projectId: string) => {
 export const trackProjectView = async (projectId: string) => {
   try {
     await fetch(`${API_BASE_URL}/projects/${projectId}/view`, {
-      method: 'POST',
+      method: "POST",
       headers: getAuthHeaders(),
     });
   } catch (error) {
-    console.error('Track view error:', error);
+    console.error("Track view error:", error);
   }
 };
 
 export const trackProjectDownload = async (projectId: string) => {
   try {
     await fetch(`${API_BASE_URL}/projects/${projectId}/download`, {
-      method: 'POST',
+      method: "POST",
       headers: getAuthHeaders(),
     });
   } catch (error) {
-    console.error('Track download error:', error);
+    console.error("Track download error:", error);
   }
 };
 
 export const getProjectAnalytics = async (projectId: string) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/projects/${projectId}/analytics`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/projects/${projectId}/analytics`,
+      {
+        headers: getAuthHeaders(),
+      }
+    );
 
     if (!response.ok) {
-      throw new Error('Failed to fetch analytics');
+      throw new Error("Failed to fetch analytics");
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Fetch analytics error:', error);
+    console.error("Fetch analytics error:", error);
     throw error;
   }
 };
 
 // ==================== SEARCH & DISCOVERY ====================
 
-export const searchPublishedWorks = async (query: string, filters?: {
-  type?: string;
-  genre?: string;
-  page?: number;
-  limit?: number;
-}) => {
+export const searchPublishedWorks = async (
+  query: string,
+  filters?: {
+    type?: string;
+    genre?: string;
+    page?: number;
+    limit?: number;
+  }
+) => {
   try {
     const params = new URLSearchParams({ search: query });
-    if (filters?.type) params.append('type', filters.type);
-    if (filters?.genre) params.append('genre', filters.genre);
-    if (filters?.page) params.append('page', filters.page.toString());
-    if (filters?.limit) params.append('limit', filters.limit.toString());
+    if (filters?.type) params.append("type", filters.type);
+    if (filters?.genre) params.append("genre", filters.genre);
+    if (filters?.page) params.append("page", filters.page.toString());
+    if (filters?.limit) params.append("limit", filters.limit.toString());
 
     const response = await fetch(`${API_BASE_URL}/search?${params}`, {
       headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
-      throw new Error('Search failed');
+      throw new Error("Search failed");
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Search error:', error);
+    console.error("Search error:", error);
     throw error;
   }
 };
 
-export const getTrendingProjects = async (period: 'day' | 'week' | 'month' = 'week', limit = 10) => {
+export const getTrendingProjects = async (
+  period: "day" | "week" | "month" = "week",
+  limit = 10
+) => {
   try {
     const response = await fetch(
       `${API_BASE_URL}/trending?period=${period}&limit=${limit}`,
@@ -620,12 +1100,12 @@ export const getTrendingProjects = async (period: 'day' | 'week' | 'month' = 'we
     );
 
     if (!response.ok) {
-      throw new Error('Failed to fetch trending projects');
+      throw new Error("Failed to fetch trending projects");
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Fetch trending error:', error);
+    console.error("Fetch trending error:", error);
     throw error;
   }
 };
@@ -637,44 +1117,12 @@ export const getRecommendedProjects = async (limit = 10) => {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch recommendations');
+      throw new Error("Failed to fetch recommendations");
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Fetch recommendations error:', error);
-    throw error;
-  }
-};
-
-// ==================== FILE UPLOAD ====================
-
-export const uploadImage = async (imageUri: string, type: 'profile' | 'cover' | 'content') => {
-  try {
-    const formData = new FormData();
-    formData.append('image', {
-      uri: imageUri,
-      type: 'image/jpeg',
-      name: `${type}_${Date.now()}.jpg`,
-    } as any);
-    formData.append('type', type);
-
-    const response = await fetch(`${API_BASE_URL}/upload/image`, {
-      method: 'POST',
-      headers: {
-        'Authorization': authToken ? `Bearer ${authToken}` : '',
-        'Content-Type': 'multipart/form-data',
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error('Image upload failed');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Upload error:', error);
+    console.error("Fetch recommendations error:", error);
     throw error;
   }
 };
@@ -684,18 +1132,18 @@ export const uploadImage = async (imageUri: string, type: 'profile' | 'cover' | 
 export const syncLocalChanges = async (syncQueue: any[]) => {
   try {
     const response = await fetch(`${API_BASE_URL}/sync`, {
-      method: 'POST',
+      method: "POST",
       headers: getAuthHeaders(),
       body: JSON.stringify({ changes: syncQueue }),
     });
 
     if (!response.ok) {
-      throw new Error('Sync failed');
+      throw new Error("Sync failed");
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Sync error:', error);
+    console.error("Sync error:", error);
     throw error;
   }
 };
@@ -708,12 +1156,12 @@ export const getServerUpdates = async (lastSyncTime: number) => {
     );
 
     if (!response.ok) {
-      throw new Error('Failed to fetch updates');
+      throw new Error("Failed to fetch updates");
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Fetch updates error:', error);
+    console.error("Fetch updates error:", error);
     throw error;
   }
 };

@@ -1,11 +1,23 @@
 # QuilKalam Mobile App
+
 <p align="center">
   <img src="./assets/images/quilkalam-logo.png" alt="QuilKalam Logo" width="300"/>
 </p>
 
-QuilKalam is a mobile application for writers and readers, providing an intuitive platform to write, organize, and share stories. Built with [Expo](https://expo.dev/), [React Native](https://reactnative.dev/), [NativeWind](https://www.nativewind.dev/), and [Tailwind CSS](https://tailwindcss.com/), it offers a modern, animated, and responsive user experience.
+## Getting Started
 
----
+### Download APK
+
+<p align="center">
+  <a href="https://play.google.com/apps/test/RQ3AyTU3HZg/ahAO29uNRZJdr7wAizQ4URGRj11jf0tCaShMYgEu4xXNtYtMVbJYe7RdqPbCfxllGdY5VVXVxHhnStjGhh3u7cqzc3">
+    <img src="https://img.shields.io/badge/Download-APK-brightgreen.svg?logo=android" alt="Download APK"/>
+  </a>
+</p>
+
+Or a simple direct link:
+
+[Download APK](https://play.google.com/apps/test/RQ3AyTU3HZg/ahAO29uNRZJdr7wAizQ4URGRj11jf0tCaShMYgEu4xXNtYtMVbJYe7RdqPbCfxllGdY5VVXVxHhnStjGhh3u7cqzc3)
+QuilKalam is a mobile application for writers and readers, providing an intuitive platform to write, organize, and share stories. Built with [Expo](https://expo.dev/), [React Native](https://reactnative.dev/), [NativeWind](https://www.nativewind.dev/), and [Tailwind CSS](https://tailwindcss.com/), it offers a modern, animated, and responsive user experience.
 
 ## Features
 
@@ -21,7 +33,7 @@ QuilKalam is a mobile application for writers and readers, providing an intuitiv
 
 - [Node.js](https://nodejs.org/) (v18+ recommended)
 - [Yarn](https://yarnpkg.com/) or [npm](https://www.npmjs.com/)
-- [Expo CLI](https://docs.expo.dev/get-started/installation/):  
+- [Expo CLI](https://docs.expo.dev/get-started/installation/):
   ```sh
   npm install -g expo-cli
   ```
@@ -29,12 +41,14 @@ QuilKalam is a mobile application for writers and readers, providing an intuitiv
 ### Installation
 
 1. **Clone the repository:**
+
    ```sh
    git clone https://github.com/your-username/quil-kalam-mobile-app.git
    cd quil-kalam-mobile-app
    ```
 
 2. **Install dependencies:**
+
    ```sh
    npm install
    # or
@@ -42,6 +56,7 @@ QuilKalam is a mobile application for writers and readers, providing an intuitiv
    ```
 
 3. **Start the development server:**
+
    ```sh
    npm run start
    # or
@@ -57,24 +72,24 @@ QuilKalam is a mobile application for writers and readers, providing an intuitiv
 
 ## Development
 
-- **Code Style:**  
+- **Code Style:**
   - Uses [ESLint](https://eslint.org/) with Expo config.
   - Tailwind CSS for styling via [NativeWind](https://www.nativewind.dev/).
-- **Type Checking:**  
+- **Type Checking:**
   - TypeScript strict mode enabled.
-- **Hot Reloading:**  
+- **Hot Reloading:**
   - Supported via Expo.
 
 ### Useful Scripts
 
-| Script           | Description                      |
-|------------------|----------------------------------|
-| `npm run start`  | Start Expo development server    |
-| `npm run android`| Run app on Android emulator      |
-| `npm run ios`    | Run app on iOS simulator         |
-| `npm run web`    | Run app in web browser           |
-| `npm run lint`   | Run ESLint checks                |
-| `npm run reset-project` | Clean and reset project   |
+| Script                  | Description                   |
+| ----------------------- | ----------------------------- |
+| `npm run start`         | Start Expo development server |
+| `npm run android`       | Run app on Android emulator   |
+| `npm run ios`           | Run app on iOS simulator      |
+| `npm run web`           | Run app in web browser        |
+| `npm run lint`          | Run ESLint checks             |
+| `npm run reset-project` | Clean and reset project       |
 
 ---
 

@@ -38,6 +38,7 @@
       "env": {
         "NODE_ENV": "production"
       },
+      
       "channel": "production"
     }
   },

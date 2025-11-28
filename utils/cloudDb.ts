@@ -1,5 +1,7 @@
+// @ts-ignore
 import { neon } from "@neondatabase/serverless";
 import { db } from "./database";
+
 const NEON_CONNECTION_STRING = process.env.EXPO_PUBLIC_NEON_DATABASE_URL || "";
 let neonDb: ReturnType<typeof neon> | null = null;
 

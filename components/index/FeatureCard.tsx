@@ -11,6 +11,7 @@ const FeatureCard = ({ icon, title, description, delay }: FeatureCardProps) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(30)).current;
 
+  // ************************************ EFFECTS **********************************
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -37,12 +38,16 @@ const FeatureCard = ({ icon, title, description, delay }: FeatureCardProps) => {
       }}
     >
       <View className="flex-row items-center mb-3">
-        <View className="w-12 h-12 rounded-xl bg-primary justify-center items-center mr-4">
+        <View className="w-12 h-12 rounded-2xl dark:border-white border  justify-center items-center mr-4">
           <Text className="text-2xl">{icon}</Text>
         </View>
-        <Text className="text-lg font-bold text-gray-900 dark:text-white flex-1">{title}</Text>
+        <Text className="text-lg font-bold text-gray-900 dark:text-white flex-1">
+          {title}
+        </Text>
       </View>
-      <Text className="text-sm text-gray-600 dark:text-white leading-5">{description}</Text>
+      <Text className="text-sm text-gray-600 dark:text-white leading-5">
+        {description}
+      </Text>
     </Animated.View>
   );
 };

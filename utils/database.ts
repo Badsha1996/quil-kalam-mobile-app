@@ -1,27 +1,8 @@
 // @ts-ignore
-import * as Crypto from "expo-crypto";
-// @ts-ignore
 import * as SQLite from "expo-sqlite";
+import { getUserProfile } from "./api";
 
 export const db = SQLite.openDatabaseSync("quilkalam.db");
-
-// ==================== PASSWORD HASHING ====================
-
-const hashPassword = async (password: string): Promise<string> => {
-  const hash = await Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    password + "quilkalam_salt_2024"
-  );
-  return hash;
-};
-
-const verifyPassword = async (
-  password: string,
-  hash: string
-): Promise<boolean> => {
-  const newHash = await hashPassword(password);
-  return newHash === hash;
-};
 
 // ==================== DATABASE MIGRATION ====================
 
@@ -52,97 +33,12 @@ const setSchemaVersion = (version: number) => {
 
 const migrateDatabase = () => {
   const currentVersion = getCurrentSchemaVersion();
-  console.log(`Current database version: ${currentVersion}`);
 
   try {
-    // Migration from version 0 to 1 (add user support)
-    // In the migrateDatabase() function, update the version 1 migration:
-
-    // Migration from version 0 to 1 (add user support)
     if (currentVersion < 1) {
-      console.log("Migrating to version 1: Adding user support...");
-
-      // Check if users table exists
-      const usersTableExists = db.getFirstSync(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
-      );
-
-      if (!usersTableExists) {
-        db.execSync(`
-      CREATE TABLE users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        phone_number TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        display_name TEXT,
-        email TEXT,
-        profile_image_uri TEXT,
-        bio TEXT,
-        synced_user_id TEXT,
-        last_sync INTEGER,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-    `);
-      } else {
-        // Add missing columns to existing users table
-        const columnsToAdd = [
-          { name: "updated_at", type: "INTEGER" },
-          { name: "email", type: "TEXT" },
-          { name: "profile_image_uri", type: "TEXT" },
-          { name: "bio", type: "TEXT" },
-          { name: "synced_user_id", type: "TEXT" },
-          { name: "last_sync", type: "INTEGER" },
-        ];
-
-        for (const col of columnsToAdd) {
-          try {
-            // For updated_at column, provide a default value
-            if (col.name === "updated_at") {
-              db.execSync(
-                `ALTER TABLE users ADD COLUMN ${col.name} ${
-                  col.type
-                } DEFAULT ${Date.now()};`
-              );
-            } else {
-              db.execSync(
-                `ALTER TABLE users ADD COLUMN ${col.name} ${col.type};`
-              );
-            }
-            console.log(`Added ${col.name} column to users table`);
-          } catch (error: any) {
-            if (!error.message?.includes("duplicate column")) {
-              console.warn(`Warning adding ${col.name}:`, error.message);
-            }
-          }
-        }
-
-        // Update any existing records that might have NULL values
-        try {
-          // First, ensure created_at has values for all records
-          db.execSync(`
-        UPDATE users SET created_at = ${Date.now()} 
-        WHERE created_at IS NULL
-      `);
-
-          // Then set updated_at to created_at for all records
-          db.execSync(`
-        UPDATE users SET updated_at = created_at 
-        WHERE updated_at IS NULL
-      `);
-        } catch (error) {
-          console.warn("Error setting default timestamp values:", error);
-        }
-      }
-
-      setSchemaVersion(1);
-      console.log("Migration to version 1 completed");
     }
 
-    // Migration from version 1 to 2 (unified items system)
     if (currentVersion < 2) {
-      console.log("Migrating to version 2: Unified items system...");
-
-      // Check if items table exists
       const itemsTableExists = db.getFirstSync(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='items'"
       );
@@ -183,18 +79,13 @@ const migrateDatabase = () => {
           "CREATE INDEX IF NOT EXISTS idx_items_type ON items(item_type);"
         );
 
-        // Migrate old data if exists
         migrateOldDataToItems();
       }
 
       setSchemaVersion(2);
-      console.log("Migration to version 2 completed");
     }
 
-    // In migrateDatabase() function, add version 3 migration
     if (currentVersion < 3) {
-      console.log("Migrating to version 3: Adding writing settings...");
-
       db.execSync(`
     CREATE TABLE IF NOT EXISTS writing_settings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -219,20 +110,15 @@ const migrateDatabase = () => {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
   `);
-
       setSchemaVersion(3);
     }
   } catch (error) {
-    console.error("Migration error:", error);
     throw error;
   }
 };
 
 const migrateOldDataToItems = () => {
   try {
-    console.log("Migrating old folder/file data to items...");
-
-    // Migrate folders
     const foldersExist = db.getFirstSync(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='folders'"
     );
@@ -260,20 +146,16 @@ const migrateOldDataToItems = () => {
             folder.created_at,
             folder.updated_at
           );
-        } catch (error) {
-          console.warn("Error migrating folder:", error);
-        }
+        } catch (error) {}
       }
     }
 
-    // Migrate files
     const filesExist = db.getFirstSync(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='files'"
     );
 
     if (filesExist) {
       const files = db.getAllSync("SELECT * FROM files") as any[];
-      console.log(`Migrating ${files.length} files...`);
 
       for (const file of files) {
         try {
@@ -294,9 +176,7 @@ const migrateOldDataToItems = () => {
             file.created_at,
             file.updated_at
           );
-        } catch (error) {
-          console.warn("Error migrating file:", error);
-        }
+        } catch (error) {}
       }
     }
 
@@ -307,7 +187,6 @@ const migrateOldDataToItems = () => {
 
     if (charactersExist) {
       const characters = db.getAllSync("SELECT * FROM characters") as any[];
-      console.log(`Migrating ${characters.length} characters...`);
 
       for (const char of characters) {
         try {
@@ -332,9 +211,7 @@ const migrateOldDataToItems = () => {
             char.created_at,
             char.updated_at
           );
-        } catch (error) {
-          console.warn("Error migrating character:", error);
-        }
+        } catch (error) {}
       }
     }
 
@@ -345,7 +222,6 @@ const migrateOldDataToItems = () => {
 
     if (locationsExist) {
       const locations = db.getAllSync("SELECT * FROM locations") as any[];
-      console.log(`Migrating ${locations.length} locations...`);
 
       for (const loc of locations) {
         try {
@@ -395,22 +271,6 @@ export const initDB = () => {
       );
     `);
 
-    db.execSync(`
-      CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        phone_number TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        display_name TEXT,
-        email TEXT,
-        profile_image_uri TEXT,
-        bio TEXT,
-        synced_user_id TEXT,
-        last_sync INTEGER,
-        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-        updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
-      );
-    `);
-
     // Create projects table
     db.execSync(`
       CREATE TABLE IF NOT EXISTS projects (
@@ -429,7 +289,7 @@ export const initDB = () => {
       );
     `);
 
-    // CRITICAL: Create content_pages table
+    // Create content_pages table
     db.execSync(`
       CREATE TABLE IF NOT EXISTS content_pages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -445,7 +305,7 @@ export const initDB = () => {
       );
     `);
 
-    // CRITICAL: Create template_stages table
+    // Create template_stages table
     db.execSync(`
       CREATE TABLE IF NOT EXISTS template_stages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -563,6 +423,8 @@ export const initDB = () => {
         acknowledgments TEXT,
         categories TEXT,
         tags TEXT,
+        is_published BOOLEAN DEFAULT 0,
+        published_project_id TEXT,
         export_format TEXT DEFAULT 'pdf',
         is_public BOOLEAN DEFAULT 1,
         allow_comments BOOLEAN DEFAULT 1,
@@ -605,6 +467,68 @@ export const initDB = () => {
       );
     `);
 
+    // Create items table for unified system
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER NOT NULL,
+        parent_item_id INTEGER,
+        item_type TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        content TEXT,
+        metadata TEXT,
+        order_index INTEGER DEFAULT 0,
+        depth_level INTEGER DEFAULT 0,
+        color TEXT,
+        icon TEXT,
+        is_included_in_export BOOLEAN DEFAULT 1,
+        is_published BOOLEAN DEFAULT 0,
+        word_count INTEGER DEFAULT 0,
+        character_count INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (parent_item_id) REFERENCES items(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Create writing_settings table
+    db.execSync(`
+      CREATE TABLE IF NOT EXISTS writing_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id INTEGER,
+        user_id INTEGER,
+        font_family TEXT DEFAULT 'Georgia',
+        font_size INTEGER DEFAULT 18,
+        line_height REAL DEFAULT 1.8,
+        text_color TEXT DEFAULT '#1F2937',
+        background_color TEXT DEFAULT '#FFFFFF',
+        paragraph_spacing INTEGER DEFAULT 16,
+        text_align TEXT DEFAULT 'left',
+        page_width INTEGER DEFAULT 650,
+        margin_top INTEGER DEFAULT 40,
+        margin_bottom INTEGER DEFAULT 40,
+        typewriter_mode BOOLEAN DEFAULT 0,
+        auto_save BOOLEAN DEFAULT 1,
+        zen_mode BOOLEAN DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+    `);
+
+    // Create indexes
+    db.execSync(
+      "CREATE INDEX IF NOT EXISTS idx_items_project ON items(project_id);"
+    );
+    db.execSync(
+      "CREATE INDEX IF NOT EXISTS idx_items_parent ON items(parent_item_id);"
+    );
+    db.execSync(
+      "CREATE INDEX IF NOT EXISTS idx_items_type ON items(item_type);"
+    );
+
     // Run migrations
     migrateDatabase();
 
@@ -616,186 +540,84 @@ export const initDB = () => {
 };
 
 // ==================== ALL OTHER FUNCTIONS FROM PREVIOUS ARTIFACT ====================
-// (Copy all functions from mobile_compatible_db artifact here)
-
-export const loginLocalUser = async (phoneNumber: string, password: string) => {
+export const setActiveSession = (userId: string | null) => {
   try {
-    const user = db.getFirstSync(
-      "SELECT * FROM users WHERE phone_number = ?",
-      phoneNumber
-    ) as any;
-
-    if (!user) {
-      throw new Error("Invalid credentials");
+    if (userId === null) {
+      setSetting("active_user_id", "");
+      setSetting("last_logout", Date.now().toString());
+    } else {
+      setSetting("active_user_id", userId);
+      setSetting("last_login", Date.now().toString());
     }
-
-    const isValid = await verifyPassword(password, user.password_hash);
-    if (!isValid) {
-      throw new Error("Invalid credentials");
-    }
-
-    return {
-      id: user.id,
-      phoneNumber: user.phone_number,
-      displayName: user.display_name,
-      email: user.email,
-      profileImage: user.profile_image_uri,
-      bio: user.bio,
-    };
   } catch (error) {
-    console.error("Error logging in:", error);
+    console.error("Error setting active session:", error);
     throw error;
   }
 };
 
-export const getCurrentUser = () => {
+export const getActiveSession = (): string | null => {
   try {
-    const user = db.getFirstSync(
-      "SELECT * FROM users ORDER BY last_sync DESC LIMIT 1"
-    ) as any;
-
-    if (!user) return null;
-
-    return {
-      id: user.id,
-      phoneNumber: user.phone_number,
-      displayName: user.display_name,
-      email: user.email,
-      profileImage: user.profile_image_uri,
-      bio: user.bio,
-    };
+    const userId = getSetting("active_user_id");
+    if (!userId || userId === "") {
+      return null;
+    }
+    return userId;
   } catch (error) {
-    console.error("Error getting current user:", error);
+    console.error("Error getting active session:", error);
     return null;
   }
 };
 
-// Add this function to check if phone number already exists
-const checkPhoneNumberExists = (phoneNumber: string): boolean => {
+export const getCurrentUser = async () => {
   try {
-    const result = db.getFirstSync(
-      "SELECT id FROM users WHERE phone_number = ?",
-      phoneNumber
-    ) as { id: number } | null;
-    return !!result;
+    const activeUserId = getActiveSession();
+
+    if (!activeUserId) {
+      return null;
+    }
+
+    try {
+      const user = await getUserProfile(activeUserId);
+      return user;
+    } catch (apiError: any) {
+      try {
+        const userDisplayName = getSetting("user_display_name");
+        const userPhoneNumber = getSetting("user_phone_number");
+        const userEmail = getSetting("user_email");
+
+        if (userDisplayName || userPhoneNumber) {
+          return {
+            id: activeUserId,
+            phoneNumber: userPhoneNumber || "",
+            displayName: userDisplayName || "",
+            email: userEmail || "",
+            profileImage: null,
+            bio: "",
+          };
+        }
+
+        return null;
+      } catch (localError) {
+        return null;
+      }
+    }
   } catch (error) {
-    console.error("Error checking phone number:", error);
-    return false;
+    return null;
   }
 };
 
-export const registerLocalUser = async (
-  phoneNumber: string,
-  password: string,
-  displayName?: string
-) => {
+export const clearActiveSession = () => {
   try {
-    // Validate phone number format
-    if (!validatePhoneNumber(phoneNumber)) {
-      throw new Error("Invalid phone number format");
-    }
-
-    // Check if phone number already exists
-    if (checkPhoneNumberExists(phoneNumber)) {
-      throw new Error("Phone number already registered");
-    }
-
-    // Validate password
-    if (!validatePassword(password)) {
-      throw new Error("Password must be at least 6 characters");
-    }
-
-    const passwordHash = await hashPassword(password);
-    const now = Date.now();
-
-    const result = db.runSync(
-      "INSERT INTO users (phone_number, password_hash, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-      phoneNumber,
-      passwordHash,
-      displayName || null,
-      now,
-      now // Make sure updated_at is also set
-    );
-
-    return {
-      id: result.lastInsertRowId,
-      phoneNumber,
-      displayName: displayName || null,
-    };
-  } catch (error: any) {
-    console.error("Error registering user:", error);
+    setActiveSession(null);
+  } catch (error) {
+    console.error("Error clearing session:", error);
     throw error;
   }
 };
 
-// Add validation functions
-const validatePhoneNumber = (phone: string): boolean => {
-  // Basic validation - allow various formats
-  const phoneRegex =
-    /^[\+]?[1-9][\d]{0,15}$|^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
-  return phoneRegex.test(phone.replace(/[\s\-\(\)\.]/g, ""));
-};
-
-const validatePassword = (password: string): boolean => {
-  return password.length >= 6;
-};
-
-// Update the profile function to handle image updates properly
-export const updateUserProfile = (
-  userId: number,
-  data: {
-    displayName?: string;
-    email?: string;
-    bio?: string;
-    profileImageUri?: string;
-  }
-) => {
-  try {
-    const updates: string[] = [];
-    const values: any[] = [];
-
-    if (data.displayName !== undefined) {
-      updates.push("display_name = ?");
-      values.push(data.displayName || null);
-    }
-    if (data.email !== undefined) {
-      updates.push("email = ?");
-      values.push(data.email || null);
-    }
-    if (data.bio !== undefined) {
-      updates.push("bio = ?");
-      values.push(data.bio || null);
-    }
-    if (data.profileImageUri !== undefined) {
-      updates.push("profile_image_uri = ?");
-      values.push(data.profileImageUri || null);
-    }
-
-    if (updates.length === 0) {
-      console.log("No updates to make");
-      return;
-    }
-
-    // Always include updated_at
-    updates.push("updated_at = ?");
-    values.push(Date.now());
-    values.push(userId);
-
-    const query = `UPDATE users SET ${updates.join(", ")} WHERE id = ?`;
-    console.log("Executing query:", query, "with values:", values);
-
-    db.runSync(query, ...values);
-
-    console.log("Profile updated successfully for user:", userId);
-  } catch (error) {
-    console.error("Error updating profile:", error);
-    throw error;
-  }
-};
-
-// Add function to update daily goal
 export const updateDailyGoal = (goal: number) => {
   try {
+    // Store in app settings instead of user table
     setSetting("daily_goal", goal.toString());
   } catch (error) {
     console.error("Error updating daily goal:", error);
@@ -831,6 +653,17 @@ export const getUserById = (userId: number) => {
 
 export const setSetting = (key: string, value: string) => {
   try {
+    // Ensure database is initialized
+    try {
+      // Quick check if app_settings table exists
+      db.getFirstSync(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='app_settings'"
+      );
+    } catch {
+      // If table doesn't exist, initialize database
+      initDB();
+    }
+
     const now = Date.now();
     db.runSync(
       "INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)",
@@ -840,7 +673,15 @@ export const setSetting = (key: string, value: string) => {
     );
   } catch (error) {
     console.error("Error setting app setting:", error);
-    throw error;
+    // If there's still an error, initialize DB and try again
+    initDB();
+    const now = Date.now();
+    db.runSync(
+      "INSERT OR REPLACE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)",
+      key,
+      value,
+      now
+    );
   }
 };
 
@@ -1211,6 +1052,7 @@ export const updateProject = (
     genre?: string;
     status?: string;
     targetWordCount?: number;
+    writing_template?: string;
   }
 ) => {
   try {
@@ -1237,6 +1079,12 @@ export const updateProject = (
     if (data.targetWordCount !== undefined) {
       updates.push("target_word_count = ?");
       values.push(data.targetWordCount);
+    }
+
+    // ADD THIS BLOCK
+    if (data.writing_template !== undefined) {
+      updates.push("writing_template = ?");
+      values.push(data.writing_template);
     }
 
     updates.push("updated_at = ?");
@@ -2189,6 +2037,8 @@ export const importProjectFromJSON = (jsonData: string) => {
     }
 
     // Import folders (with mapping for parent relationships)
+
+    // @ts-ignore
     const folderMap = new Map();
     if (data.folders) {
       data.folders.forEach((folder: any) => {
@@ -2660,6 +2510,196 @@ export const setWritingSetting = (data: {
     }
   } catch (error) {
     console.error("Error setting writing settings:", error);
+    throw error;
+  }
+};
+
+
+// ==================== LOCAL DATA EXPORT/IMPORT ====================
+
+export const exportAllDataAsJSON = async () => {
+  try {
+    const allProjects = getAllProjects();
+    const exportData: any = {
+      version: "1.0",
+      exportDate: Date.now(),
+      settings: {},
+      projects: []
+    };
+
+    // Export app settings
+    const settingsKeys = ['daily_goal', 'user_display_name', 'user_email', 'user_phone_number', 'active_user_id'];
+    settingsKeys.forEach(key => {
+      const value = getSetting(key);
+      if (value) {
+        exportData.settings[key] = value;
+      }
+    });
+
+    // Export each project with all related data
+    for (const project of allProjects as any[]) {
+      const projectData = {
+        project: project,
+        items: getItemsByProject(project.id),
+        covers: getProjectCovers(project.id),
+        contentPage: getContentPage(project.id),
+        publishingSettings: getPublishingSettings(project.id),
+        templateStages: getTemplateStages(project.id),
+        writingSettings: getWritingSettings(project.id),
+        formattingStyles: getFormatting(project.id),
+        // Legacy data for compatibility
+        folders: getFoldersByProject(project.id),
+        files: getFilesByProject(project.id),
+        characters: getCharactersByProject(project.id),
+        locations: getLocationsByProject(project.id)
+      };
+      exportData.projects.push(projectData);
+    }
+
+    return JSON.stringify(exportData, null, 2);
+  } catch (error) {
+    console.error("Error exporting all data:", error);
+    throw error;
+  }
+};
+
+export const importAllDataFromJSON = async (jsonData: string) => {
+  try {
+    const data = JSON.parse(jsonData);
+    
+    // Import app settings
+    if (data.settings) {
+      Object.keys(data.settings).forEach(key => {
+        setSetting(key, data.settings[key]);
+      });
+    }
+
+    // Import projects
+    const importedProjectIds: number[] = [];
+    
+    for (const projectData of data.projects) {
+      // Create project
+      const projectId = createProject({
+        type: projectData.project.type,
+        title: projectData.project.title,
+        description: projectData.project.description,
+        genre: projectData.project.genre,
+        authorName: projectData.project.author_name,
+        writingTemplate: projectData.project.writing_template,
+        targetWordCount: projectData.project.target_word_count
+      });
+
+      // Update project status
+      if (projectData.project.status) {
+        updateProject(projectId, { status: projectData.project.status });
+      }
+
+      // Import covers
+      if (projectData.covers) {
+        projectData.covers.forEach((cover: any) => {
+          setProjectCover(
+            projectId,
+            cover.cover_type,
+            cover.image_uri,
+            cover.image_width,
+            cover.image_height
+          );
+        });
+      }
+
+      // Import items
+      if (projectData.items && projectData.items.length > 0) {
+        const itemMap = new Map();
+        
+        // Sort items by depth level to handle parent-child relationships
+        const sortedItems = [...projectData.items].sort((a: any, b: any) => 
+          (a.depth_level || 0) - (b.depth_level || 0)
+        );
+
+        sortedItems.forEach((item: any) => {
+          const newItemId = createItem({
+            projectId,
+            parentItemId: item.parent_item_id ? itemMap.get(item.parent_item_id) : undefined,
+            itemType: item.item_type,
+            name: item.name,
+            description: item.description,
+            content: item.content,
+            metadata: item.metadata ? JSON.parse(item.metadata) : undefined,
+            orderIndex: item.order_index,
+            color: item.color,
+            icon: item.icon
+          });
+          itemMap.set(item.id, newItemId);
+        });
+      }
+
+      // Import publishing settings
+      if (projectData.publishingSettings) {
+        setPublishingSettings(projectId, {
+          isbn: projectData.publishingSettings.isbn,
+          publisher: projectData.publishingSettings.publisher,
+          publicationDate: projectData.publishingSettings.publication_date,
+          price: projectData.publishingSettings.price,
+          language: projectData.publishingSettings.language,
+          copyrightText: projectData.publishingSettings.copyright_text,
+          dedication: projectData.publishingSettings.dedication,
+          acknowledgments: projectData.publishingSettings.acknowledgments,
+          exportFormat: projectData.publishingSettings.export_format
+        });
+      }
+
+      // Import writing settings
+      if (projectData.writingSettings) {
+        setWritingSetting({
+          projectId,
+          fontFamily: projectData.writingSettings.font_family,
+          fontSize: projectData.writingSettings.font_size,
+          lineHeight: projectData.writingSettings.line_height,
+          textColor: projectData.writingSettings.text_color,
+          backgroundColor: projectData.writingSettings.background_color,
+          paragraphSpacing: projectData.writingSettings.paragraph_spacing,
+          textAlign: projectData.writingSettings.text_align,
+          pageWidth: projectData.writingSettings.page_width,
+          marginTop: projectData.writingSettings.margin_top,
+          marginBottom: projectData.writingSettings.margin_bottom,
+          typewriterMode: projectData.writingSettings.typewriter_mode === 1,
+          autoSave: projectData.writingSettings.auto_save === 1,
+          zenMode: projectData.writingSettings.zen_mode === 1
+        });
+      }
+
+      // Import template stages
+      if (projectData.templateStages) {
+        projectData.templateStages.forEach((stage: any) => {
+          const now = Date.now();
+          db.runSync(
+            `INSERT INTO template_stages (
+              project_id, template_type, stage_name, stage_description, 
+              order_index, is_completed, notes, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            projectId,
+            stage.template_type,
+            stage.stage_name,
+            stage.stage_description,
+            stage.order_index,
+            stage.is_completed,
+            stage.notes,
+            now,
+            now
+          );
+        });
+      }
+
+      importedProjectIds.push(projectId);
+    }
+
+    return {
+      success: true,
+      projectsImported: importedProjectIds.length,
+      projectIds: importedProjectIds
+    };
+  } catch (error) {
+    console.error("Error importing data:", error);
     throw error;
   }
 };
