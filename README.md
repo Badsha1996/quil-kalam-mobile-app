@@ -24,11 +24,6 @@
 
 ## 📥 Downloads
 
-| Platform | Link |
-| -------- | ---- |
-
-## 📥 Downloads
-
 | Platform                           | Link                                                                                                                                                                                                                                    |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Google Play (Early Access)**     | [![Download](https://img.shields.io/badge/Download-Early%20Access-blue?logo=google-play)](https://play.google.com/store/apps/details?id=com.quilkalam.myapp)                                                                            |
