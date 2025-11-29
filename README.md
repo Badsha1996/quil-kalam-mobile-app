@@ -24,12 +24,20 @@
 
 ## 📥 Downloads
 
-| Platform | Link |
-|----------|------|
+| Platform                           | Link                                                                                                                                                                                                                                    |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Google Play (Internal Testing)** | [![Download](https://img.shields.io/badge/Download-Internal%20Testing-blue?logo=google-play)](https://play.google.com/apps/test/RQ3AyTU3HZg/ahAO29uNRZJdr7wAizQ4URGRj11jf0tCaShMYgEu4xXNtYtMVbJYe7RdqPbCfxllGdY5VVXVxHhnStjGhh3u7cqzc3) |
-| **Latest Release APK** | [![Download](https://img.shields.io/badge/Download-APK-brightgreen?logo=android)](https://github.com/Badsha1996/quil-kalam-mobile-app/releases/download/apk/Quilkalam-v1.apk) |
+| **Latest Release APK**             | [![Download](https://img.shields.io/badge/Download-APK-brightgreen?logo=android)](https://github.com/Badsha1996/quil-kalam-mobile-app/releases/download/apk/Quilkalam-v1.apk)                                                           |
 
 > QuilKalam is a cross-platform mobile application built with **Expo**, **React Native**, **NativeWind**, and **Tailwind CSS**. It provides writers and readers with an intuitive, modern platform to write, organize, and share stories with beautiful animations and responsive design.
+
+## Screenshots
+
+<p align="center">
+  <img src="./assets/screenchots/Screenshot_20251123_110222.jpg" alt="QuilKalam - Home" width="300"/>
+  <img src="./assets/screenchots/Screenshot_20251123_110240.jpg" alt="QuilKalam - Editor" width="300"/>
+  <img src="./assets/screenchots/Screenshot_20251123_110248.jpg" alt="QuilKalam - Organization" width="300"/>
+</p>
 
 ## Features
 
