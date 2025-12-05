@@ -726,10 +726,10 @@ const NovelDetails = () => {
     if (item.item_type === "folder" || item.item_type === "chapter") {
       setCurrentFolder(item.id);
       setFolderPath([...folderPath, item]);
-      clearSelection(); // Clear selection when navigating to a folder
+      clearSelection();
     } else {
       handleEditItem(item);
-      clearSelection(); // Clear selection when opening an item for editing
+      clearSelection();
     }
   };
   const handleEditItem = (item: ItemNode) => {
@@ -786,31 +786,29 @@ const NovelDetails = () => {
   };
 
   const handleDeleteItem = (item: ItemNode) => {
-    if (isSelectionMode) {
-      // If in selection mode, add to selection instead of immediate delete
-      toggleItemSelection(item.id);
-      return;
-    }
-
     GlobalAlert.show({
       title: "Delete Item",
       message: `Delete "${item.name}"? This will also delete all nested items.`,
-      primaryText: "Cancel",
 
-      secondaryText: "Delete",
-      onSecondary: () => {
+      // Make Delete the primary action
+      primaryText: "Delete",
+      onPrimary: () => {
+        // Changed from onSecondary to onPrimary
         try {
           deleteItem(item.id);
           loadProjectData();
-          clearSelection(); // Clear selection after deletion
+          clearSelection();
         } catch (error) {
           GlobalAlert.show({
             title: "Error",
-            message: "Failed to delete items",
+            message: "Failed to delete item",
             primaryText: "Okay",
           });
         }
       },
+
+      // Cancel becomes secondary
+      secondaryText: "Cancel",
     });
   };
 
@@ -823,8 +821,8 @@ const NovelDetails = () => {
       message: `Delete ${selectedItems.size} selected item(s)? This will also delete all nested items.`,
 
       // Primary button = destructive delete
-      primaryText: "Delete",
-      onPrimary: () => {
+      secondaryText: "Delete",
+      onSecondary: () => {
         try {
           for (const itemId of selectedItems) {
             deleteItem(itemId);
@@ -850,8 +848,9 @@ const NovelDetails = () => {
       },
 
       // Cancel button (auto-closes modal)
-      secondaryText: "Cancel",
-      onSecondary: () => {}, // no action needed
+
+      primaryText: "Cancel",
+      onPrimary: () => {},
     });
   };
 
@@ -1557,9 +1556,6 @@ const NovelDetails = () => {
 
                   secondaryText: "Rename",
                   onSecondary: () => handleRenameItem(item),
-
-                  tertiaryText: "Delete",
-                  onTertiary: () => handleDeleteItem(item),
                 });
               }
             }}
@@ -1824,12 +1820,16 @@ const NovelDetails = () => {
 
   const toggleItemSelection = (itemId: number) => {
     const newSelected = new Set(selectedItems);
+
     if (newSelected.has(itemId)) {
       newSelected.delete(itemId);
     } else {
       newSelected.add(itemId);
     }
+
     setSelectedItems(newSelected);
+
+    // Update selection mode based on whether we have any selected items
     setIsSelectionMode(newSelected.size > 0);
   };
 
@@ -2041,33 +2041,6 @@ const NovelDetails = () => {
     }
   };
 
-  const performMove = async (targetFolderId: number | null) => {
-    try {
-      for (const itemId of selectedItems) {
-        await updateItem(itemId, {
-          parent_item_id: targetFolderId || null,
-        } as any);
-      }
-
-      loadProjectData();
-      clearSelection();
-      setShowActionModal(false);
-
-      GlobalAlert.show({
-        title: "Success",
-        message: `${selectedItems.size} item(s) moved successfully!`,
-        primaryText: "Okay",
-      });
-    } catch (error) {
-      console.error("Move error:", error);
-      GlobalAlert.show({
-        title: "Error",
-        message: "Failed to move items",
-        primaryText: "Okay",
-      });
-    }
-  };
-
   const findItemById = (items: ItemNode[], id: number): ItemNode | null => {
     for (const item of items) {
       if (item.id === id) return item;
@@ -2090,104 +2063,14 @@ const NovelDetails = () => {
   };
 
   // Find the renderActionModal function and update the JSX:
-  const renderActionModal = () => (
-    <Modal
-      visible={showActionModal}
-      transparent
-      animationType="slide"
-      onRequestClose={() => setShowActionModal(false)}
-    >
-      <View className="flex-1 bg-black/50 justify-center items-center px-6">
-        <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md">
-          <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-4 text-center">
-            Move {selectedItems.size} Item(s)
-          </Text>
+  // Add this state at the top with other states
+  const [selectedTargetFolder, setSelectedTargetFolder] = useState<
+    number | null
+  >(null);
 
-          <Text className="text-sm text-gray-600 dark:text-light-200 mb-4 text-center">
-            Select destination folder:
-          </Text>
+  
 
-          <ScrollView className="max-h-60 mb-4">
-            <TouchableOpacity
-              onPress={() => performMove(null)}
-              className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-2 flex-row items-center"
-            >
-              <Text className="text-2xl mr-3">📁</Text>
-              <Text className="text-base font-bold text-gray-900 dark:text-light-100">
-                Root Folder
-              </Text>
-            </TouchableOpacity>
-
-            {renderFolderOptions(items)}
-          </ScrollView>
-
-          <View className="flex-row gap-3">
-            <TouchableOpacity
-              onPress={() => setShowActionModal(false)}
-              className="flex-1 bg-light-100 dark:bg-dark-100 py-4 rounded-full"
-            >
-              <Text className="text-gray-600 dark:text-light-200 font-bold text-center">
-                Cancel
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                // Add a default move to root if no folder is selected
-                performMove(null);
-              }}
-              className="flex-1 bg-primary py-4 rounded-full"
-            >
-              <Text className="text-white font-bold text-center">
-                Move to Root
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-
-  const renderFolderOptions = (
-    items: ItemNode[],
-    depth: number = 0
-  ): JSX.Element[] => {
-    const options: JSX.Element[] = [];
-
-    items.forEach((item) => {
-      if (item.item_type === "folder" || item.item_type === "chapter") {
-        // Don't allow moving into currently selected folders or their children
-        const isSelectedOrChild = Array.from(selectedItems).some(
-          (selectedId) => {
-            const selectedItem = findItemById(items, selectedId);
-            return selectedItem && isItemInHierarchy(selectedItem, item.id);
-          }
-        );
-
-        if (!isSelectedOrChild) {
-          options.push(
-            <TouchableOpacity
-              key={`folder-${item.id}`}
-              onPress={() => performMove(item.id)}
-              className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-2 flex-row items-center"
-              style={{ marginLeft: depth * 20 }}
-            >
-              <Text className="text-2xl mr-3">📁</Text>
-              <Text className="text-base font-bold text-gray-900 dark:text-light-100 flex-1">
-                {item.name}
-              </Text>
-            </TouchableOpacity>
-          );
-        }
-
-        // Recursively render child folders
-        if (item.children && !collapsedFolders.has(item.id)) {
-          options.push(...renderFolderOptions(item.children, depth + 1));
-        }
-      }
-    });
-
-    return options;
-  };
+  
 
   const isItemInHierarchy = (item: ItemNode, folderId: number): boolean => {
     if (item.id === folderId) return true;
@@ -2240,15 +2123,6 @@ const NovelDetails = () => {
                   >
                     <Text className="text-white font-bold text-center text-sm">
                       📋 Copy
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={handleMoveItems}
-                    className="flex-1 bg-blue-500 py-3.5 rounded-xl"
-                  >
-                    <Text className="text-white font-bold text-center text-sm">
-                      📁 Move
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -3628,7 +3502,7 @@ const NovelDetails = () => {
         {renderStatisticsModal()}
         {renderExportModal()}
         {renderSelectionToolbar()}
-        {renderActionModal()}
+      
         {renderRenameModal()}
         {renderFAB()}
 

@@ -2239,6 +2239,7 @@ export const updateItem = (
     color?: string;
     icon?: string;
     isIncludedInExport?: boolean;
+    parent_item_id?: number | null; // ADD THIS LINE
   }
 ) => {
   try {
@@ -2285,6 +2286,11 @@ export const updateItem = (
     if (data.isIncludedInExport !== undefined) {
       updates.push("is_included_in_export = ?");
       values.push(data.isIncludedInExport ? 1 : 0);
+    }
+    // ADD THIS BLOCK
+    if (data.parent_item_id !== undefined) {
+      updates.push("parent_item_id = ?");
+      values.push(data.parent_item_id);
     }
 
     updates.push("updated_at = ?");
@@ -2514,7 +2520,6 @@ export const setWritingSetting = (data: {
   }
 };
 
-
 // ==================== LOCAL DATA EXPORT/IMPORT ====================
 
 export const exportAllDataAsJSON = async () => {
@@ -2524,12 +2529,18 @@ export const exportAllDataAsJSON = async () => {
       version: "1.0",
       exportDate: Date.now(),
       settings: {},
-      projects: []
+      projects: [],
     };
 
     // Export app settings
-    const settingsKeys = ['daily_goal', 'user_display_name', 'user_email', 'user_phone_number', 'active_user_id'];
-    settingsKeys.forEach(key => {
+    const settingsKeys = [
+      "daily_goal",
+      "user_display_name",
+      "user_email",
+      "user_phone_number",
+      "active_user_id",
+    ];
+    settingsKeys.forEach((key) => {
       const value = getSetting(key);
       if (value) {
         exportData.settings[key] = value;
@@ -2551,7 +2562,7 @@ export const exportAllDataAsJSON = async () => {
         folders: getFoldersByProject(project.id),
         files: getFilesByProject(project.id),
         characters: getCharactersByProject(project.id),
-        locations: getLocationsByProject(project.id)
+        locations: getLocationsByProject(project.id),
       };
       exportData.projects.push(projectData);
     }
@@ -2566,17 +2577,17 @@ export const exportAllDataAsJSON = async () => {
 export const importAllDataFromJSON = async (jsonData: string) => {
   try {
     const data = JSON.parse(jsonData);
-    
+
     // Import app settings
     if (data.settings) {
-      Object.keys(data.settings).forEach(key => {
+      Object.keys(data.settings).forEach((key) => {
         setSetting(key, data.settings[key]);
       });
     }
 
     // Import projects
     const importedProjectIds: number[] = [];
-    
+
     for (const projectData of data.projects) {
       // Create project
       const projectId = createProject({
@@ -2586,7 +2597,7 @@ export const importAllDataFromJSON = async (jsonData: string) => {
         genre: projectData.project.genre,
         authorName: projectData.project.author_name,
         writingTemplate: projectData.project.writing_template,
-        targetWordCount: projectData.project.target_word_count
+        targetWordCount: projectData.project.target_word_count,
       });
 
       // Update project status
@@ -2610,16 +2621,18 @@ export const importAllDataFromJSON = async (jsonData: string) => {
       // Import items
       if (projectData.items && projectData.items.length > 0) {
         const itemMap = new Map();
-        
+
         // Sort items by depth level to handle parent-child relationships
-        const sortedItems = [...projectData.items].sort((a: any, b: any) => 
-          (a.depth_level || 0) - (b.depth_level || 0)
+        const sortedItems = [...projectData.items].sort(
+          (a: any, b: any) => (a.depth_level || 0) - (b.depth_level || 0)
         );
 
         sortedItems.forEach((item: any) => {
           const newItemId = createItem({
             projectId,
-            parentItemId: item.parent_item_id ? itemMap.get(item.parent_item_id) : undefined,
+            parentItemId: item.parent_item_id
+              ? itemMap.get(item.parent_item_id)
+              : undefined,
             itemType: item.item_type,
             name: item.name,
             description: item.description,
@@ -2627,7 +2640,7 @@ export const importAllDataFromJSON = async (jsonData: string) => {
             metadata: item.metadata ? JSON.parse(item.metadata) : undefined,
             orderIndex: item.order_index,
             color: item.color,
-            icon: item.icon
+            icon: item.icon,
           });
           itemMap.set(item.id, newItemId);
         });
@@ -2644,7 +2657,7 @@ export const importAllDataFromJSON = async (jsonData: string) => {
           copyrightText: projectData.publishingSettings.copyright_text,
           dedication: projectData.publishingSettings.dedication,
           acknowledgments: projectData.publishingSettings.acknowledgments,
-          exportFormat: projectData.publishingSettings.export_format
+          exportFormat: projectData.publishingSettings.export_format,
         });
       }
 
@@ -2664,7 +2677,7 @@ export const importAllDataFromJSON = async (jsonData: string) => {
           marginBottom: projectData.writingSettings.margin_bottom,
           typewriterMode: projectData.writingSettings.typewriter_mode === 1,
           autoSave: projectData.writingSettings.auto_save === 1,
-          zenMode: projectData.writingSettings.zen_mode === 1
+          zenMode: projectData.writingSettings.zen_mode === 1,
         });
       }
 
@@ -2696,7 +2709,7 @@ export const importAllDataFromJSON = async (jsonData: string) => {
     return {
       success: true,
       projectsImported: importedProjectIds.length,
-      projectIds: importedProjectIds
+      projectIds: importedProjectIds,
     };
   } catch (error) {
     console.error("Error importing data:", error);
