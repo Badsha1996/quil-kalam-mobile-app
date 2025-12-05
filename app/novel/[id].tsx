@@ -496,7 +496,7 @@ const NovelDetails = () => {
       });
       setTypewriterMode(writingSettingsData.typewriter_mode === 1);
       setAutoSaveEnabled(writingSettingsData.auto_save === 1);
-      setZenMode(writingSettingsData.zen_mode === 1);
+      setZenMode(false);
     }
   };
 
@@ -1769,17 +1769,57 @@ const NovelDetails = () => {
   };
 
   const getCharacters = () => {
-    return items.filter((item) => item.item_type === "character");
+    const characters: ItemNode[] = [];
+
+    const traverseItems = (items: ItemNode[]) => {
+      items.forEach((item) => {
+        if (item.item_type === "character") {
+          characters.push(item);
+        }
+        if (item.children && item.children.length > 0) {
+          traverseItems(item.children);
+        }
+      });
+    };
+
+    traverseItems(items);
+    return characters;
   };
 
   const getLocations = () => {
-    return items.filter((item) => item.item_type === "location");
+    const locations: ItemNode[] = [];
+
+    const traverseItems = (items: ItemNode[]) => {
+      items.forEach((item) => {
+        if (item.item_type === "location") {
+          locations.push(item);
+        }
+        if (item.children && item.children.length > 0) {
+          traverseItems(item.children);
+        }
+      });
+    };
+
+    traverseItems(items);
+    return locations;
   };
 
   const getNotes = () => {
-    return items.filter(
-      (item) => item.item_type === "note" || item.item_type === "research"
-    );
+    const notes: ItemNode[] = [];
+
+    const traverseItems = (items: ItemNode[]) => {
+      items.forEach((item) => {
+        if (item.item_type === "note" || item.item_type === "research") {
+          notes.push(item);
+        }
+        if (item.children && item.children.length > 0) {
+          traverseItems(item.children);
+        }
+      });
+    };
+
+    traverseItems(items);
+    return notes;
   };
 
   const toggleItemSelection = (itemId: number) => {
@@ -2001,22 +2041,25 @@ const NovelDetails = () => {
     }
   };
 
-  const performMove = (targetFolderId: number | null) => {
+  const performMove = async (targetFolderId: number | null) => {
     try {
       for (const itemId of selectedItems) {
-        // @ts-ignore
-        updateItem(itemId, { parent_item_id: targetFolderId });
+        await updateItem(itemId, {
+          parent_item_id: targetFolderId || null,
+        } as any);
       }
+
+      loadProjectData();
+      clearSelection();
+      setShowActionModal(false);
 
       GlobalAlert.show({
         title: "Success",
         message: `${selectedItems.size} item(s) moved successfully!`,
         primaryText: "Okay",
       });
-      clearSelection();
-      setShowActionModal(false);
-      loadProjectData();
     } catch (error) {
+      console.error("Move error:", error);
       GlobalAlert.show({
         title: "Error",
         message: "Failed to move items",
@@ -2046,6 +2089,7 @@ const NovelDetails = () => {
     setCollapsedFolders(newCollapsed);
   };
 
+  // Find the renderActionModal function and update the JSX:
   const renderActionModal = () => (
     <Modal
       visible={showActionModal}
@@ -2084,6 +2128,17 @@ const NovelDetails = () => {
             >
               <Text className="text-gray-600 dark:text-light-200 font-bold text-center">
                 Cancel
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                // Add a default move to root if no folder is selected
+                performMove(null);
+              }}
+              className="flex-1 bg-primary py-4 rounded-full"
+            >
+              <Text className="text-white font-bold text-center">
+                Move to Root
               </Text>
             </TouchableOpacity>
           </View>
@@ -2807,8 +2862,8 @@ const NovelDetails = () => {
           onRequestClose={() => setShowAddModal(false)}
         >
           <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{ flex: 1, justifyContent: "flex-end" }}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={{ flex: 1 }}
             keyboardVerticalOffset={Platform.select({ ios: 0, android: 25 })}
           >
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -2828,16 +2883,28 @@ const NovelDetails = () => {
                       </Text>
                       <View className="flex-row flex-wrap gap-2 mb-4">
                         {[
-                          { value: "document", label: "Document", icon: "📄" },
+                          {
+                            value: "document",
+                            label: "Document",
+                            icon: "📄",
+                          },
                           { value: "folder", label: "Folder", icon: "📁" },
                           {
                             value: "character",
                             label: "Character",
                             icon: "👤",
                           },
-                          { value: "location", label: "Location", icon: "📍" },
+                          {
+                            value: "location",
+                            label: "Location",
+                            icon: "📍",
+                          },
                           { value: "note", label: "Note", icon: "📝" },
-                          { value: "research", label: "Research", icon: "🔬" },
+                          {
+                            value: "research",
+                            label: "Research",
+                            icon: "🔬",
+                          },
                         ].map((type) => (
                           <TouchableOpacity
                             key={type.value}
@@ -2968,12 +3035,12 @@ const NovelDetails = () => {
           statusBarTranslucent={true}
         >
           <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
             style={{ flex: 1 }}
             keyboardVerticalOffset={Platform.select({ ios: 0, android: 25 })}
           >
             <View
-              className="flex-1"
+              className="flex-1 max-h-max"
               style={{
                 backgroundColor: zenMode
                   ? writingSettings.backgroundColor
@@ -3069,57 +3136,251 @@ const NovelDetails = () => {
                 </TouchableOpacity>
               )}
 
-              <View className="flex-1">
+              <View className="flex-1 max-h-screen ">
                 {(editingItem?.item_type === "character" ||
                   editingItem?.item_type === "location") && (
                   <>
-                    <TouchableOpacity
-                      onPress={handlePickEditImage}
-                      className="bg-light-100 dark:bg-dark-100 rounded-2xl p-4 mb-4 items-center mx-4 mt-4"
+                    {/* Tab Navigation */}
+                    <View
+                      className="px-4 pt-4 pb-2 "
+                      style={{
+                        backgroundColor: writingSettings.backgroundColor,
+                      }}
                     >
-                      {editingItem?.metadata?.imageUri ? (
-                        <Image
-                          source={{ uri: editingItem.metadata.imageUri }}
-                          className="w-40 h-40 rounded-xl mb-2"
-                        />
-                      ) : (
-                        <View className="w-40 h-40 rounded-xl bg-gray-200 dark:bg-dark-300 justify-center items-center mb-2">
-                          <Text className="text-5xl">
-                            {editingItem?.item_type === "character"
-                              ? "👤"
-                              : "📍"}
+                      <View className="flex-row gap-2">
+                        <TouchableOpacity
+                          onPress={() =>
+                            setEditingItem({
+                              ...editingItem,
+                              metadata: {
+                                ...editingItem.metadata,
+                                activeTab: "image",
+                              },
+                            })
+                          }
+                          className={`flex-1 py-3 rounded-2xl ${
+                            (editingItem?.metadata?.activeTab || "image") ===
+                            "image"
+                              ? "bg-primary"
+                              : "bg-light-100 dark:bg-dark-100"
+                          }`}
+                        >
+                          <Text
+                            className={`text-center font-bold ${
+                              (editingItem?.metadata?.activeTab || "image") ===
+                              "image"
+                                ? "text-white"
+                                : "text-gray-600 dark:text-light-200"
+                            }`}
+                          >
+                            📷 Photo
                           </Text>
-                        </View>
-                      )}
-                      <Text className="text-sm text-primary font-semibold">
-                        {editingItem?.metadata?.imageUri
-                          ? "Change Image"
-                          : "Add Image"}
-                      </Text>
-                    </TouchableOpacity>
+                        </TouchableOpacity>
 
-                    <TextInput
-                      value={editingItem?.metadata?.description || ""}
-                      onChangeText={(text) =>
-                        setEditingItem({
-                          ...editingItem,
-                          metadata: {
-                            ...editingItem.metadata,
-                            description: text,
-                          },
-                        })
-                      }
-                      placeholder="Description..."
-                      placeholderTextColor="#9CA3AF"
-                      multiline
-                      numberOfLines={4}
-                      textAlignVertical="top"
-                      className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-4 mx-4 mb-4 text-gray-900 dark:text-light-100"
-                    />
+                        <TouchableOpacity
+                          onPress={() =>
+                            setEditingItem({
+                              ...editingItem,
+                              metadata: {
+                                ...editingItem.metadata,
+                                activeTab: "description",
+                              },
+                            })
+                          }
+                          className={`flex-1 py-3 rounded-2xl ${
+                            editingItem?.metadata?.activeTab === "description"
+                              ? "bg-primary"
+                              : "bg-light-100 dark:bg-dark-100"
+                          }`}
+                        >
+                          <Text
+                            className={`text-center font-bold ${
+                              editingItem?.metadata?.activeTab === "description"
+                                ? "text-white"
+                                : "text-gray-600 dark:text-light-200"
+                            }`}
+                          >
+                            📝 Description
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Photo Tab */}
+                    {(editingItem?.metadata?.activeTab || "image") ===
+                      "image" && (
+                      <ScrollView
+                        className="flex-1 px-4"
+                        style={{
+                          backgroundColor: writingSettings.backgroundColor,
+                        }}
+                      >
+                        <View className="py-4">
+                          <TouchableOpacity
+                            onPress={handlePickEditImage}
+                            className="rounded-3xl p-6 items-center"
+                            style={{
+                              backgroundColor: writingSettings.backgroundColor,
+                            }}
+                          >
+                            {editingItem?.metadata?.imageUri ? (
+                              <Image
+                                source={{
+                                  uri: editingItem.metadata.imageUri,
+                                }}
+                                className="w-72 h-72 rounded-3xl mb-6"
+                                resizeMode="cover"
+                              />
+                            ) : (
+                              <View
+                                className="w-72 h-72 rounded-3xl justify-center items-center mb-6"
+                                style={{
+                                  backgroundColor: `${writingSettings.textColor}10`,
+                                }}
+                              >
+                                <Text className="text-8xl mb-3">
+                                  {editingItem?.item_type === "character"
+                                    ? "👤"
+                                    : "📍"}
+                                </Text>
+                                <Text
+                                  className="text-sm"
+                                  style={{
+                                    color: writingSettings.textColor,
+                                    opacity: 0.6,
+                                  }}
+                                >
+                                  Tap to add {editingItem?.item_type} image
+                                </Text>
+                              </View>
+                            )}
+                            <View className="bg-primary px-8 py-4 rounded-full">
+                              <Text className="text-white font-bold text-base">
+                                {editingItem?.metadata?.imageUri
+                                  ? "📷 Change Photo"
+                                  : "➕ Add Photo"}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        </View>
+                      </ScrollView>
+                    )}
+
+                    {/* Description Tab with Rich Editor */}
+                    {editingItem?.metadata?.activeTab === "description" && (
+                      <View className="flex-1">
+                        <RichToolbar
+                          editor={editorRef}
+                          actions={[
+                            actions.setBold,
+                            actions.setItalic,
+                            actions.setUnderline,
+                            actions.heading1,
+                            actions.heading2,
+                            actions.insertBulletsList,
+                            actions.insertOrderedList,
+                            actions.blockquote,
+                          ]}
+                          iconMap={{
+                            // @ts-ignore
+                            [actions.setBold]: ({ tintColor }) => (
+                              <Text
+                                style={{
+                                  color: tintColor,
+                                  fontWeight: "bold",
+                                  fontSize: 16,
+                                }}
+                              >
+                                B
+                              </Text>
+                            ), // @ts-ignore
+                            [actions.setItalic]: ({ tintColor }) => (
+                              <Text
+                                style={{
+                                  color: tintColor,
+                                  fontStyle: "italic",
+                                  fontSize: 16,
+                                }}
+                              >
+                                I
+                              </Text>
+                            ), // @ts-ignore
+                            [actions.setUnderline]: ({ tintColor }) => (
+                              <Text
+                                style={{
+                                  color: tintColor,
+                                  textDecorationLine: "underline",
+                                  fontSize: 16,
+                                }}
+                              >
+                                U
+                              </Text>
+                            ),
+                          }}
+                          style={{
+                            backgroundColor: writingSettings.backgroundColor,
+                            borderBottomWidth: 1,
+                            borderBottomColor: `${writingSettings.textColor}20`,
+                          }}
+                        />
+
+                        <ScrollView
+                          className="flex-1"
+                          contentContainerStyle={{
+                            paddingHorizontal: 20,
+                            paddingVertical: 20,
+                          }}
+                          style={{
+                            backgroundColor: writingSettings.backgroundColor,
+                          }}
+                        >
+                          <RichEditor
+                            ref={editorRef}
+                            initialContentHTML={
+                              editingItem?.metadata?.description || ""
+                            }
+                            onChange={(html) => {
+                              setEditingItem({
+                                ...editingItem,
+                                metadata: {
+                                  ...editingItem.metadata,
+                                  description: html,
+                                },
+                              });
+                            }}
+                            placeholder={`Write detailed notes about this ${editingItem?.item_type}...`}
+                            style={{
+                              flex: 1,
+                              minHeight: height - 300,
+                              backgroundColor: writingSettings.backgroundColor,
+                            }}
+                            editorStyle={{
+                              backgroundColor: writingSettings.backgroundColor,
+                              color: writingSettings.textColor,
+                              caretColor: writingSettings.textColor,
+                              contentCSSText: `
+                                font-size: ${writingSettings.fontSize}px;
+                                line-height: ${writingSettings.lineHeight};
+                                font-family: ${
+                                  writingSettings.fontFamily === "System"
+                                    ? "system-ui, -apple-system, sans-serif"
+                                    : writingSettings.fontFamily
+                                };
+                                padding: 16px;
+                                color: ${writingSettings.textColor};
+                              `,
+                            }}
+                            useContainer={true}
+                          />
+                        </ScrollView>
+                      </View>
+                    )}
                   </>
                 )}
 
-                {editingItem?.item_type === "document" && (
+                {(editingItem?.item_type === "document" ||
+                  editingItem?.item_type === "note" ||
+                  editingItem?.item_type === "research") && (
                   <View className="flex-1">
                     {!zenMode && (
                       <RichToolbar
@@ -3241,28 +3502,31 @@ const NovelDetails = () => {
                 )}
               </View>
 
-              {editingItem?.item_type === "document" && !zenMode && (
-                <View className="bg-white dark:bg-dark-300 border-t border-gray-200 dark:border-dark-100 px-6 py-3">
-                  <View className="flex-row justify-between items-center">
-                    <Text className="text-sm text-gray-600 dark:text-light-200">
-                      Words: {editorStats.wordCount.toLocaleString()}
-                    </Text>
-                    <Text className="text-sm text-gray-600 dark:text-light-200">
-                      Characters: {editorStats.charCount.toLocaleString()}
-                    </Text>
-                    <Text className="text-sm text-gray-600 dark:text-light-200">
-                      Reading: {editorStats.readingTime}m
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => handleZenModeToggle(!zenMode)}
-                    >
-                      <Text className="text-sm text-primary font-semibold">
-                        Zen Mode
+              {(editingItem?.item_type === "document" ||
+                editingItem?.item_type === "note" ||
+                editingItem?.item_type === "research") &&
+                !zenMode && (
+                  <View className="bg-white dark:bg-dark-300 border-t border-gray-200 dark:border-dark-100 px-6 py-3">
+                    <View className="flex-row justify-between items-center">
+                      <Text className="text-sm text-gray-600 dark:text-light-200">
+                        Words: {editorStats.wordCount.toLocaleString()}
                       </Text>
-                    </TouchableOpacity>
+                      <Text className="text-sm text-gray-600 dark:text-light-200">
+                        Characters: {editorStats.charCount.toLocaleString()}
+                      </Text>
+                      <Text className="text-sm text-gray-600 dark:text-light-200">
+                        Reading: {editorStats.readingTime}m
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => handleZenModeToggle(!zenMode)}
+                      >
+                        <Text className="text-sm text-primary font-semibold">
+                          Zen Mode
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-              )}
+                )}
             </View>
           </KeyboardAvoidingView>
         </Modal>
