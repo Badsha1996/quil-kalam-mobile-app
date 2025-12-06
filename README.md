@@ -28,7 +28,7 @@
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Google Play (Early Access)**     | [![Download](https://img.shields.io/badge/Download-Early%20Access-blue?logo=google-play)](https://play.google.com/store/apps/details?id=com.quilkalam.myapp)                                                                            |
 | **Google Play (Internal Testing)** | [![Download](https://img.shields.io/badge/Download-Internal%20Testing-blue?logo=google-play)](https://play.google.com/apps/test/RQ3AyTU3HZg/ahAO29uNRZJdr7wAizQ4URGRj11jf0tCaShMYgEu4xXNtYtMVbJYe7RdqPbCfxllGdY5VVXVxHhnStjGhh3u7cqzc3) |
-| **Latest Release APK**             | [![Download](https://img.shields.io/badge/Download-APK-brightgreen?logo=android)](https://github.com/Badsha1996/quil-kalam-mobile-app/releases/download/quilkalam-v1.1.0/quilkalam.apk)                                                 |
+| **Latest Release APK**             | [![Download](https://img.shields.io/badge/Download-APK-brightgreen?logo=android)](https://github.com/Badsha1996/quil-kalam-mobile-app/releases/download/quilkalam-v1.2.0/application-1a4ae530-bc3f-430a-a26e-08124eeb3775.apk)                                                 |
 
 > **Note:** To access early access builds, please join our [QuilKalam Beta Tester](https://groups.google.com/g/quilkalam-beta-tester) group first.
 
