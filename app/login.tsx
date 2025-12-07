@@ -185,47 +185,95 @@ const AuthScreen = () => {
     setShowCountryPicker(false);
   };
 
-  const CountryPicker = () => (
-    <Modal visible={showCountryPicker} animationType="slide" transparent={true}>
-      <View className="flex-1 justify-center bg-black/50">
-        <View className="mx-4 bg-white dark:bg-dark-200 rounded-2xl max-h-80">
-          <View className="p-4 border-b border-gray-200 dark:border-dark-100">
-            <Text className="text-lg font-bold text-gray-900 dark:text-light-100">
-              Select Country
-            </Text>
+  const CountryPicker = () => {
+    const [searchQuery, setSearchQuery] = useState("");
+    const [filteredCountries, setFilteredCountries] = useState(countries);
+
+    const handleSearch = (query: string) => {
+      setSearchQuery(query);
+      if (query.trim() === "") {
+        setFilteredCountries(countries);
+      } else {
+        const filtered = countries.filter(
+          (country) =>
+            country.name.toLowerCase().includes(query.toLowerCase()) ||
+            country.dial_code.includes(query) ||
+            country.code.toLowerCase().includes(query.toLowerCase())
+        );
+        setFilteredCountries(filtered);
+      }
+    };
+
+    return (
+      <Modal
+        visible={showCountryPicker}
+        animationType="slide"
+        transparent={true}
+      >
+        <View className="flex-1 justify-center bg-black/50">
+          <View className="mx-4 bg-white dark:bg-dark-200 rounded-2xl max-h-96">
+            <View className="p-4 border-b border-gray-200 dark:border-dark-100">
+              <Text className="text-lg font-bold text-gray-900 dark:text-light-100 mb-3">
+                Select Country
+              </Text>
+              {/* Search Bar */}
+              <View className="bg-light-100 dark:bg-dark-100 rounded-xl px-4 py-3 flex-row items-center">
+                <Text className="text-lg mr-2">🔍</Text>
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={handleSearch}
+                  placeholder="Search country or code..."
+                  placeholderTextColor="#9CA3AF"
+                  className="flex-1 text-gray-900 dark:text-light-100"
+                  autoFocus={true}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => handleSearch("")}>
+                    <Text className="text-gray-500 dark:text-light-200">✕</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+            <FlatList
+              data={filteredCountries}
+              keyExtractor={(item) => item.code}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  onPress={() => selectCountry(item)}
+                  className="px-4 py-3 flex-row items-center border-b border-gray-100 dark:border-dark-100"
+                >
+                  <Text className="text-lg mr-3 text-gray-900 dark:text-light-100">
+                    {item.dial_code}
+                  </Text>
+                  <Text className="text-gray-900 dark:text-light-100 flex-1">
+                    {item.name}
+                  </Text>
+                  <Text className="text-gray-500 dark:text-light-200">
+                    {item.code}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View className="p-4 items-center">
+                  <Text className="text-gray-500 dark:text-light-200">
+                    No countries found
+                  </Text>
+                </View>
+              }
+            />
+            <TouchableOpacity
+              onPress={() => setShowCountryPicker(false)}
+              className="p-4 border-t border-gray-200 dark:border-dark-100"
+            >
+              <Text className="text-primary text-center font-semibold">
+                Cancel
+              </Text>
+            </TouchableOpacity>
           </View>
-          <FlatList
-            data={countries}
-            keyExtractor={(item) => item.code}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                onPress={() => selectCountry(item)}
-                className="px-4 py-3 flex-row items-center border-b border-gray-100 dark:border-dark-100"
-              >
-                <Text className="text-lg mr-3 text-gray-900 dark:text-light-100">
-                  {item.dial_code}
-                </Text>
-                <Text className="text-gray-900 dark:text-light-100 flex-1">
-                  {item.name}
-                </Text>
-                <Text className="text-gray-500 dark:text-light-200">
-                  {item.code}
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
-          <TouchableOpacity
-            onPress={() => setShowCountryPicker(false)}
-            className="p-4 border-t border-gray-200 dark:border-dark-100"
-          >
-            <Text className="text-primary text-center font-semibold">
-              Cancel
-            </Text>
-          </TouchableOpacity>
         </View>
-      </View>
-    </Modal>
-  );
+      </Modal>
+    );
+  };
 
   return (
     <Background>

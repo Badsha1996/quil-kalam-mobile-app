@@ -2909,9 +2909,9 @@ const NovelDetails = () => {
           statusBarTranslucent={true}
         >
           <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={{ flex: 1 }}
-            keyboardVerticalOffset={Platform.select({ ios: 0, android: 25 })}
+            keyboardVerticalOffset={Platform.select({ ios: 0, android: 0 })}
           >
             <View
               className="flex-1 max-h-max"

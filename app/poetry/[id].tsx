@@ -42,12 +42,17 @@ import {
   Vibration,
   Share,
   FlatList,
+  ActivityIndicator,
 } from "react-native";
 
 const { width, height } = Dimensions.get("window");
 
 // ==================== CONSTANTS ====================
+
+// ==================== CONSTANTS ====================
+// Enhanced local rhyme database for offline use
 const COMMON_RHYMES: Record<string, string[]> = {
+  // -ight words
   ight: [
     "night",
     "light",
@@ -59,8 +64,29 @@ const COMMON_RHYMES: Record<string, string[]> = {
     "flight",
     "tight",
     "delight",
+    "knight",
+    "fright",
+    "slight",
+    "plight",
+    "twilight",
   ],
-  ove: ["love", "dove", "above", "shove", "glove"],
+
+  // -ove words
+  ove: [
+    "love",
+    "dove",
+    "above",
+    "shove",
+    "glove",
+    "stove",
+    "prove",
+    "move",
+    "improve",
+    "approve",
+    "remove",
+  ],
+
+  // -ay words
   ay: [
     "day",
     "way",
@@ -72,8 +98,31 @@ const COMMON_RHYMES: Record<string, string[]> = {
     "gray",
     "pray",
     "sway",
+    "clay",
+    "delay",
+    "display",
+    "betray",
+    "array",
+    "today",
   ],
-  eart: ["heart", "start", "part", "art", "cart", "dart", "smart", "apart"],
+
+  // -eart words
+  eart: [
+    "heart",
+    "start",
+    "part",
+    "art",
+    "cart",
+    "dart",
+    "smart",
+    "apart",
+    "chart",
+    "depart",
+    "impart",
+    "restart",
+  ],
+
+  // -ow words
   ow: [
     "flow",
     "grow",
@@ -84,7 +133,15 @@ const COMMON_RHYMES: Record<string, string[]> = {
     "snow",
     "throw",
     "below",
+    "blow",
+    "crow",
+    "row",
+    "shadow",
+    "rainbow",
+    "willow",
   ],
+
+  // -ine words
   ine: [
     "line",
     "mine",
@@ -95,7 +152,15 @@ const COMMON_RHYMES: Record<string, string[]> = {
     "sign",
     "vine",
     "define",
+    "decline",
+    "combine",
+    "pine",
+    "spine",
+    "twine",
+    "shine",
   ],
+
+  // -ate words
   ate: [
     "fate",
     "late",
@@ -106,7 +171,15 @@ const COMMON_RHYMES: Record<string, string[]> = {
     "gate",
     "hate",
     "mate",
+    "date",
+    "rate",
+    "plate",
+    "debate",
+    "relate",
+    "celebrate",
   ],
+
+  // -ound words
   ound: [
     "sound",
     "found",
@@ -116,7 +189,13 @@ const COMMON_RHYMES: Record<string, string[]> = {
     "wound",
     "around",
     "profound",
+    "compound",
+    "background",
+    "playground",
+    "surround",
   ],
+
+  // -een words
   een: [
     "seen",
     "green",
@@ -126,9 +205,99 @@ const COMMON_RHYMES: Record<string, string[]> = {
     "serene",
     "queen",
     "keen",
+    "scene",
+    "routine",
+    "marine",
+    "fifteen",
+    "eighteen",
+    "sunshine",
   ],
-  all: ["fall", "call", "small", "tall", "wall", "hall", "ball", "all"],
+
+  // -all words
+  all: [
+    "fall",
+    "call",
+    "small",
+    "tall",
+    "wall",
+    "hall",
+    "ball",
+    "all",
+    "install",
+    "recall",
+    "overall",
+    "baseball",
+    "football",
+  ],
+
+  // Additional common endings
+  ing: [
+    "sing",
+    "ring",
+    "wing",
+    "king",
+    "thing",
+    "spring",
+    "bring",
+    "sting",
+    "cling",
+    "fling",
+  ],
+  air: [
+    "fair",
+    "hair",
+    "chair",
+    "stair",
+    "repair",
+    "despair",
+    "affair",
+    "impair",
+  ],
+  ore: [
+    "more",
+    "store",
+    "score",
+    "shore",
+    "explore",
+    "ignore",
+    "adore",
+    "restore",
+  ],
+  ace: [
+    "face",
+    "space",
+    "grace",
+    "place",
+    "race",
+    "trace",
+    "embrace",
+    "disgrace",
+  ],
+  end: [
+    "friend",
+    "send",
+    "spend",
+    "trend",
+    "blend",
+    "mend",
+    "defend",
+    "extend",
+  ],
+  ice: ["nice", "price", "slice", "advice", "device", "entice", "sacrifice"],
+  old: ["gold", "hold", "cold", "fold", "told", "bold", "sold", "scold"],
+  ear: ["fear", "near", "clear", "dear", "year", "appear", "disappear"],
+  ook: ["book", "look", "cook", "hook", "brook", "overlook", "notebook"],
+  ain: ["rain", "pain", "train", "brain", "chain", "explain", "remain"],
+  ile: ["smile", "while", "style", "file", "trial", "denial", "defile"],
+  ack: ["back", "black", "track", "attack", "stack", "feedback", "quarterback"],
+  ell: ["tell", "well", "bell", "sell", "shell", "spell", "parallel"],
+  ide: ["side", "wide", "ride", "hide", "guide", "divide", "coincide"],
+  est: ["best", "rest", "test", "west", "quest", "suggest", "invest"],
+  ake: ["make", "take", "cake", "shake", "awake", "mistake", "undertake"],
 };
+
+// API endpoint for Datamuse (free word-finding API)
+const DATAMUSE_API = "https://api.datamuse.com/words";
 
 const POWER_WORDS = {
   emotion: [
@@ -267,23 +436,138 @@ const detectRhymeScheme = (text: string): string => {
 const getWordEnding = (word: string): string => {
   word = word.toLowerCase().replace(/[^a-z]/g, "");
   if (word.length < 2) return word;
-  const vowels = "aeiou";
-  for (let i = word.length - 1; i >= 0; i--) {
-    if (vowels.includes(word[i])) return word.slice(i);
-  }
-  return word.slice(-2);
-};
 
-const findRhymes = (word: string): string[] => {
-  if (!word) return [];
-  const ending = getWordEnding(word.toLowerCase());
-  for (const [key, rhymes] of Object.entries(COMMON_RHYMES)) {
-    if (ending.includes(key) || key.includes(ending.slice(-2))) {
-      return rhymes.filter((r) => r !== word.toLowerCase());
+  // Common vowel endings
+  const vowelEndings = [
+    "ing",
+    "ed",
+    "er",
+    "est",
+    "ly",
+    "ment",
+    "tion",
+    "sion",
+    "ance",
+    "ence",
+  ];
+
+  for (const ending of vowelEndings) {
+    if (word.endsWith(ending)) {
+      return ending;
     }
   }
+
+  // Last vowel + remaining letters
+  const vowels = "aeiouy";
+  for (let i = word.length - 1; i >= 0; i--) {
+    if (vowels.includes(word[i])) {
+      return word.slice(i);
+    }
+  }
+
+  return word.slice(-3);
+};
+
+const findRhymes = async (
+  word: string
+): Promise<{ word: string; score: number }[]> => {
+  if (!word) return [];
+
+  const wordLower = word.toLowerCase().trim();
+
+  try {
+    // Try Datamuse API first (online)
+    const response = await fetch(`${DATAMUSE_API}?rel_rhy=${wordLower}&max=20`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.length > 0) {
+        return data.map((item: any) => ({
+          word: item.word,
+          score: item.score || 0,
+        }));
+      }
+    }
+  } catch (error) {
+    console.log("Datamuse API failed, using local dictionary");
+  }
+
+  // Fallback to local enhanced rhyme dictionary
+  const ending = getWordEnding(wordLower);
+
+  // Find the best matching ending
+  let bestMatch = null;
+  let bestScore = 0;
+
+  for (const [key, rhymes] of Object.entries(COMMON_RHYMES)) {
+    // Calculate similarity score
+    const keyEnd = key.slice(-3);
+    const wordEnd = ending.slice(-3);
+
+    if (keyEnd === wordEnd) {
+      bestMatch = key;
+      bestScore = 3; // Exact match
+      break;
+    } else if (
+      key.includes(ending.slice(-2)) ||
+      ending.includes(key.slice(-2))
+    ) {
+      const score = 2; // Partial match
+      if (score > bestScore) {
+        bestMatch = key;
+        bestScore = score;
+      }
+    }
+  }
+
+  if (bestMatch && COMMON_RHYMES[bestMatch]) {
+    return COMMON_RHYMES[bestMatch]
+      .filter((r) => r !== wordLower)
+      .map((r) => ({ word: r, score: bestScore }));
+  }
+
   return [];
 };
+
+// Helper function to get similar words (synonyms/related)
+const findSimilarWords = async (
+  word: string,
+  type: "synonym" | "related" | "adjective" = "synonym"
+): Promise<string[]> => {
+  if (!word) return [];
+
+  const wordLower = word.toLowerCase().trim();
+  let relType = "";
+
+  switch (type) {
+    case "synonym":
+      relType = "rel_syn";
+      break;
+    case "related":
+      relType = "rel_trg";
+      break;
+    case "adjective":
+      relType = "rel_jjb";
+      break;
+    default:
+      relType = "rel_syn";
+  }
+
+  try {
+    const response = await fetch(
+      `${DATAMUSE_API}?${relType}=${wordLower}&max=15`
+    );
+    if (response.ok) {
+      const data = await response.json();
+      return data.map((item: any) => item.word).slice(0, 10);
+    }
+  } catch (error) {
+    console.log("Datamuse API failed for similar words");
+  }
+
+  return [];
+};
+
+// Enhanced word ending detection
 
 const analyzeStressPattern = (line: string): string => {
   const words = line.trim().split(/\s+/);
@@ -478,6 +762,10 @@ const PoetryDetails = () => {
   const [rhymeWord, setRhymeWord] = useState("");
   const [foundRhymes, setFoundRhymes] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
+  // Add to your state declarations
+  const [selectedCategory, setSelectedCategory] = useState<
+    "all" | "minimal" | "dark" | "warm" | "cool" | "nature"
+  >("all");
 
   // Goals State
   const [dailyPoemGoal, setDailyPoemGoal] = useState(1);
@@ -505,6 +793,30 @@ const PoetryDetails = () => {
   const headerHeight = useRef(new Animated.Value(1)).current;
   const autoSaveTimer = useRef<any>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Add to your existing state declarations
+  const [isLoadingRhymes, setIsLoadingRhymes] = useState(false);
+  const [similarWords, setSimilarWords] = useState<{
+    synonyms: string[];
+    related: string[];
+    adjectives: string[];
+  }>({
+    synonyms: [],
+    related: [],
+    adjectives: [],
+  });
+  const [wordTypes, setWordTypes] = useState<
+    "rhymes" | "synonyms" | "related" | "adjectives"
+  >("rhymes");
+
+  const previewListRef = useRef<FlatList>(null);
+  const scrollToPage = (page: number) => {
+    previewListRef.current?.scrollToIndex({
+      index: page,
+      animated: true,
+      viewPosition: 0.5,
+    });
+  };
 
   // Simple helpers
   const countLines = (text: string) =>
@@ -559,9 +871,46 @@ const PoetryDetails = () => {
   }, [editingPoem?.content, project?.writing_template]);
 
   useEffect(() => {
-    setFoundRhymes(rhymeWord.trim() ? findRhymes(rhymeWord.trim()) : []);
+    const searchRhymes = async () => {
+      if (rhymeWord.trim()) {
+        setIsLoadingRhymes(true);
+        const rhymes = await findRhymes(rhymeWord.trim());
+        setFoundRhymes(rhymes.map((r) => r.word));
+        setIsLoadingRhymes(false);
+      } else {
+        setFoundRhymes([]);
+      }
+    };
+
+    searchRhymes();
   }, [rhymeWord]);
 
+  // New effect for similar words
+  useEffect(() => {
+    const searchSimilarWords = async () => {
+      if (rhymeWord.trim() && wordTypes !== "rhymes") {
+        let results: string[] = [];
+        switch (wordTypes) {
+          case "synonyms":
+            results = await findSimilarWords(rhymeWord, "synonym");
+            setSimilarWords((prev) => ({ ...prev, synonyms: results }));
+            break;
+          case "related":
+            results = await findSimilarWords(rhymeWord, "related");
+            setSimilarWords((prev) => ({ ...prev, related: results }));
+            break;
+          case "adjectives":
+            results = await findSimilarWords(rhymeWord, "adjective");
+            setSimilarWords((prev) => ({ ...prev, adjectives: results }));
+            break;
+        }
+      }
+    };
+
+    if (rhymeWord.trim()) {
+      searchSimilarWords();
+    }
+  }, [rhymeWord, wordTypes]);
   // Add this useEffect to trigger search when type changes
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -975,7 +1324,7 @@ const PoetryDetails = () => {
               className="bg-purple-100 px-3 py-2 rounded-full"
             >
               <Text className="text-xs font-bold text-purple-700">
-                🎵 Rhyme
+                🔍 Words
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -1607,42 +1956,49 @@ const PoetryDetails = () => {
               </TouchableOpacity>
             )}
             {renderLiveSyllableCounter()}
-            <ScrollView
-              className="flex-1"
-              contentContainerStyle={{
-                paddingHorizontal: zenMode ? 40 : 20,
-                paddingVertical: zenMode ? 60 : 20,
-                alignItems: "center",
-              }}
-              style={{ backgroundColor: selectedTheme.bg }}
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={{ flex: 1 }}
+              keyboardVerticalOffset={Platform.select({ ios: 0, android: 45 })}
             >
-              <View
-                style={{
-                  width: zenMode ? Math.min(650, width - 80) : "100%",
-                  maxWidth: 700,
+              <ScrollView
+                className="flex-1"
+                contentContainerStyle={{
+                  paddingHorizontal: zenMode ? 40 : 20,
+                  paddingVertical: zenMode ? 60 : 20,
+                  alignItems: "center",
                 }}
+                style={{ backgroundColor: selectedTheme.bg }}
               >
-                <TextInput
-                  value={editingPoem?.content || ""}
-                  onChangeText={(text) =>
-                    setEditingPoem({ ...editingPoem, content: text })
-                  }
-                  placeholder="Pour your heart onto the page..."
-                  placeholderTextColor={selectedTheme.text + "60"}
-                  multiline
-                  textAlignVertical="top"
+                <View
                   style={{
-                    minHeight: height,
-                    fontSize: 18,
-                    lineHeight: 32,
-                    fontFamily: "serif",
-                    color: selectedTheme.text,
-                    backgroundColor: selectedTheme.bg,
-                    padding: zenMode ? 40 : 16,
+                    width: zenMode ? Math.min(650, width - 80) : "100%",
+                    maxWidth: 700,
                   }}
-                />
-              </View>
-            </ScrollView>
+                >
+                  <TextInput
+                    value={editingPoem?.content || ""}
+                    onChangeText={(text) =>
+                      setEditingPoem({ ...editingPoem, content: text })
+                    }
+                    placeholder="Pour your heart onto the page..."
+                    placeholderTextColor={selectedTheme.text + "60"}
+                    multiline
+                    textAlignVertical="top"
+                    style={{
+                      minHeight: height,
+                      fontSize: 18,
+                      lineHeight: 32,
+                      fontFamily: "serif",
+                      color: selectedTheme.text,
+                      backgroundColor: selectedTheme.bg,
+                      padding: zenMode ? 40 : 16,
+                    }}
+                  />
+                </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
+
             {renderEditorToolbar()}
             {!zenMode && (
               <View className="bg-white border-t border-gray-200 px-6 py-3">
@@ -1910,69 +2266,259 @@ const PoetryDetails = () => {
         </Modal>
 
         {/* Rhyme Modal */}
+        {/* Enhanced Word Finder Modal */}
         <Modal
           visible={showRhymeModal}
           transparent
           animationType="slide"
-          onRequestClose={() => setShowRhymeModal(false)}
+          onRequestClose={() => {
+            setShowRhymeModal(false);
+            setRhymeWord("");
+            setIsLoadingRhymes(false);
+            setWordTypes("rhymes");
+          }}
         >
           <View className="flex-1 bg-black/90 justify-end">
-            <View className="bg-white dark:bg-dark-200 rounded-t-3xl p-6 max-h-[70%]">
+            <View className="bg-white dark:bg-dark-200 rounded-t-3xl p-6 max-h-[85%]">
               <View className="flex-row items-center justify-between mb-4">
-                <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
-                  🎵 Rhyme Finder
-                </Text>
+                <View>
+                  <Text className="text-xl font-bold text-gray-900 dark:text-light-100">
+                    🎵 Word Explorer
+                  </Text>
+                  <Text className="text-xs text-gray-500 dark:text-light-200">
+                    Find rhymes, synonyms & related words
+                  </Text>
+                </View>
                 <TouchableOpacity
-                  onPress={() => setShowRhymeModal(false)}
-                  className="w-8 h-8 rounded-full bg-gray-200 justify-center items-center"
+                  onPress={() => {
+                    setShowRhymeModal(false);
+                    setRhymeWord("");
+                    setIsLoadingRhymes(false);
+                    setWordTypes("rhymes");
+                  }}
+                  className="w-8 h-8 rounded-full bg-gray-200 dark:bg-dark-100 justify-center items-center"
                 >
-                  <Text>✕</Text>
+                  <Text className="dark:text-light-100">✕</Text>
                 </TouchableOpacity>
               </View>
+
               <TextInput
                 value={rhymeWord}
                 onChangeText={setRhymeWord}
-                placeholder="Type a word to find rhymes..."
+                placeholder="Enter a word to explore..."
                 placeholderTextColor="#9CA3AF"
-                className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-3 mb-4 text-gray-900 dark:text-light-100"
+                className="bg-light-100 dark:bg-dark-100 rounded-2xl px-4 py-3 mb-4 text-gray-900 dark:text-light-100 text-lg"
                 autoFocus
+                autoCapitalize="none"
+                autoCorrect={false}
               />
-              {foundRhymes.length > 0 ? (
-                <ScrollView showsVerticalScrollIndicator={false}>
-                  <View className="flex-row flex-wrap gap-2">
-                    {foundRhymes.map((rhyme, i) => (
-                      <TouchableOpacity
-                        key={i}
-                        onPress={() => {
-                          insertWordAtCursor(rhyme);
-                          Vibration.vibrate(30);
-                        }}
-                        className="bg-purple-100 dark:bg-purple-200 px-4 py-2 rounded-full"
-                      >
-                        <Text className="text-purple-700 dark:text-purple-900 font-semibold">
-                          {rhyme}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-              ) : rhymeWord ? (
-                <Text className="text-gray-500 text-center py-8">
-                  No rhymes found. Try another word!
-                </Text>
-              ) : (
+
+              {/* Word Type Selector */}
+              <View className="flex-row gap-2 mb-4">
+                {(
+                  [
+                    { key: "rhymes", label: "🎵 Rhymes", emoji: "🎵" },
+                    { key: "synonyms", label: "📖 Synonyms", emoji: "📖" },
+                    { key: "related", label: "🔗 Related", emoji: "🔗" },
+                    { key: "adjectives", label: "📝 Adjectives", emoji: "📝" },
+                  ] as const
+                ).map((type) => (
+                  <TouchableOpacity
+                    key={type.key}
+                    onPress={() => setWordTypes(type.key)}
+                    className={`px-3 py-2 rounded-full flex-row items-center gap-1 ${
+                      wordTypes === type.key
+                        ? "bg-primary"
+                        : "bg-gray-100 dark:bg-dark-100"
+                    }`}
+                  >
+                    <Text
+                      className={
+                        wordTypes === type.key
+                          ? "text-white"
+                          : "text-gray-600 dark:text-light-200"
+                      }
+                    >
+                      {type.emoji}
+                    </Text>
+                    <Text
+                      className={`text-xs font-semibold ${
+                        wordTypes === type.key
+                          ? "text-white"
+                          : "text-gray-600 dark:text-light-200"
+                      }`}
+                    >
+                      {type.label.split(" ")[0]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {isLoadingRhymes ? (
                 <View className="py-8 items-center">
-                  <Text className="text-4xl mb-2">🎶</Text>
-                  <Text className="text-gray-500 text-center">
-                    Enter a word to discover rhyming possibilities
+                  <ActivityIndicator size="large" color="#8B5CF6" />
+                  <Text className="text-gray-500 dark:text-light-200 mt-3">
+                    Searching words...
                   </Text>
                 </View>
+              ) : rhymeWord ? (
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  className="max-h-96"
+                >
+                  {wordTypes === "rhymes" ? (
+                    foundRhymes.length > 0 ? (
+                      <>
+                        <Text className="text-sm text-gray-600 dark:text-light-200 mb-2">
+                          Found {foundRhymes.length} rhymes for "{rhymeWord}"
+                        </Text>
+                        <View className="flex-row flex-wrap gap-2">
+                          {foundRhymes.map((rhyme, i) => (
+                            <TouchableOpacity
+                              key={i}
+                              onPress={() => {
+                                insertWordAtCursor(rhyme);
+                                Vibration.vibrate(30);
+                              }}
+                              className="bg-purple-100 dark:bg-purple-900/30 px-4 py-3 rounded-xl active:scale-95"
+                            >
+                              <Text className="text-purple-700 dark:text-purple-300 font-semibold text-sm">
+                                {rhyme}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </>
+                    ) : (
+                      <View className="py-8 items-center">
+                        <Text className="text-4xl mb-2">🔍</Text>
+                        <Text className="text-gray-500 dark:text-light-200 text-center mb-2">
+                          No rhymes found for "{rhymeWord}"
+                        </Text>
+                        <Text className="text-xs text-gray-400 dark:text-light-300 text-center">
+                          Try another word or check your connection
+                        </Text>
+                      </View>
+                    )
+                  ) : (
+                    <View>
+                      <Text className="text-sm text-gray-600 dark:text-light-200 mb-2">
+                        {wordTypes === "synonyms" &&
+                          `Synonyms for "${rhymeWord}"`}
+                        {wordTypes === "related" &&
+                          `Words related to "${rhymeWord}"`}
+                        {wordTypes === "adjectives" &&
+                          `Adjectives for "${rhymeWord}"`}
+                      </Text>
+                      <View className="flex-row flex-wrap gap-2">
+                        {(() => {
+                          const words =
+                            wordTypes === "synonyms"
+                              ? similarWords.synonyms
+                              : wordTypes === "related"
+                              ? similarWords.related
+                              : similarWords.adjectives;
+
+                          if (words.length === 0 && !isLoadingRhymes) {
+                            return (
+                              <View className="py-4 items-center w-full">
+                                <Text className="text-gray-500 dark:text-light-200">
+                                  No {wordTypes} found
+                                </Text>
+                              </View>
+                            );
+                          }
+
+                          return words.map((word, i) => (
+                            <TouchableOpacity
+                              key={i}
+                              onPress={() => {
+                                insertWordAtCursor(word);
+                                Vibration.vibrate(30);
+                              }}
+                              className={`px-4 py-3 rounded-xl active:scale-95 ${
+                                wordTypes === "synonyms"
+                                  ? "bg-blue-100 dark:bg-blue-900/30"
+                                  : wordTypes === "related"
+                                  ? "bg-green-100 dark:bg-green-900/30"
+                                  : "bg-orange-100 dark:bg-orange-900/30"
+                              }`}
+                            >
+                              <Text
+                                className={`font-semibold text-sm ${
+                                  wordTypes === "synonyms"
+                                    ? "text-blue-700 dark:text-blue-300"
+                                    : wordTypes === "related"
+                                    ? "text-green-700 dark:text-green-300"
+                                    : "text-orange-700 dark:text-orange-300"
+                                }`}
+                              >
+                                {word}
+                              </Text>
+                            </TouchableOpacity>
+                          ));
+                        })()}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Tips Section */}
+                  <View className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                    <Text className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-1">
+                      💡 Tips for Better Results
+                    </Text>
+                    <Text className="text-xs text-blue-600 dark:text-blue-400">
+                      • Use base words (e.g., "run" instead of "running")
+                    </Text>
+                    <Text className="text-xs text-blue-600 dark:text-blue-400">
+                      • Try common, single-syllable words
+                    </Text>
+                    <Text className="text-xs text-blue-600 dark:text-blue-400">
+                      • Check spelling for accurate results
+                    </Text>
+                  </View>
+                </ScrollView>
+              ) : (
+                <View className="py-8 items-center">
+                  <Text className="text-4xl mb-2">🔍</Text>
+                  <Text className="text-gray-500 dark:text-light-200 text-center mb-4">
+                    Enter a word to discover rhymes, synonyms, and related words
+                  </Text>
+                  <View className="bg-gray-100 dark:bg-dark-100 rounded-xl p-4 w-full">
+                    <Text className="text-sm font-semibold text-gray-700 dark:text-light-200 mb-2">
+                      Try searching:
+                    </Text>
+                    <View className="flex-row flex-wrap gap-2">
+                      {["love", "light", "dream", "heart", "time", "star"].map(
+                        (word) => (
+                          <TouchableOpacity
+                            key={word}
+                            onPress={() => setRhymeWord(word)}
+                            className="bg-white dark:bg-dark-200 px-3 py-2 rounded-full"
+                          >
+                            <Text className="text-gray-700 dark:text-light-200">
+                              {word}
+                            </Text>
+                          </TouchableOpacity>
+                        )
+                      )}
+                    </View>
+                  </View>
+                </View>
               )}
+
               <TouchableOpacity
-                onPress={() => setShowRhymeModal(false)}
+                onPress={() => {
+                  setShowRhymeModal(false);
+                  setRhymeWord("");
+                  setIsLoadingRhymes(false);
+                  setWordTypes("rhymes");
+                }}
                 className="bg-primary py-3 rounded-full mt-4"
               >
-                <Text className="text-white font-bold text-center">Close</Text>
+                <Text className="text-white font-bold text-center">
+                  Close Explorer
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2469,6 +3015,7 @@ const PoetryDetails = () => {
         </Modal>
 
         {/* Theme Modal */}
+        {/* Enhanced Theme Modal with Categories */}
         <Modal
           visible={showThemeModal}
           transparent
@@ -2476,56 +3023,185 @@ const PoetryDetails = () => {
           onRequestClose={() => setShowThemeModal(false)}
         >
           <View className="flex-1 bg-black/90 justify-center items-center px-6">
-            <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md">
-              <Text className="text-2xl font-bold text-gray-900 mb-4 text-center">
-                🎨 Editor Theme
+            <View className="bg-white dark:bg-dark-200 rounded-3xl p-6 w-full max-w-md max-h-[90%]">
+              <Text className="text-2xl font-bold text-gray-900 dark:text-light-100 mb-4 text-center">
+                🎨 Editor Themes
               </Text>
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {colorThemes.map((theme, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    onPress={() => {
-                      setSelectedTheme(theme);
-                      setWritingSetting({
-                        projectId: projectId,
-                        backgroundColor: theme.bg,
-                        textColor: theme.text,
-                      });
-                      setShowThemeModal(false);
-                    }}
-                    className="mb-3 rounded-2xl overflow-hidden border-2"
-                    style={{
-                      borderColor:
-                        selectedTheme.name === theme.name
-                          ? theme.accent
-                          : "#E5E7EB",
-                    }}
-                  >
-                    <View style={{ backgroundColor: theme.bg }} className="p-4">
-                      <Text
-                        style={{ color: theme.text }}
-                        className="font-bold text-lg mb-2"
+
+              {/* Category Tabs */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="mb-4"
+              >
+                <View className="flex-row gap-2">
+                  {["all", "minimal", "dark", "warm", "cool", "nature"].map(
+                    (category) => (
+                      <TouchableOpacity
+                        key={category}
+                        className={`px-4 py-2 rounded-full ${
+                          selectedCategory === category
+                            ? "bg-primary"
+                            : "bg-gray-100 dark:bg-dark-100"
+                        }`}
+                        // @ts-ignore
+                        onPress={() => setSelectedCategory(category)}
                       >
-                        {theme.name}
-                      </Text>
-                      <View className="flex-row gap-2">
-                        <View
-                          style={{ backgroundColor: theme.accent }}
-                          className="w-8 h-8 rounded-full"
-                        />
-                        <View
-                          style={{ backgroundColor: theme.text + "40" }}
-                          className="w-8 h-8 rounded-full"
-                        />
+                        <Text
+                          className={`text-sm font-semibold ${
+                            selectedCategory === category
+                              ? "text-white"
+                              : "text-gray-600 dark:text-light-200"
+                          }`}
+                        >
+                          {category === "all"
+                            ? "✨ All"
+                            : category === "minimal"
+                            ? "⚪ Minimal"
+                            : category === "dark"
+                            ? "🌙 Dark"
+                            : category === "warm"
+                            ? "🔥 Warm"
+                            : category === "cool"
+                            ? "❄️ Cool"
+                            : "🌿 Nature"}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  )}
+                </View>
+              </ScrollView>
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                className="max-h-[60vh]"
+              >
+                {colorThemes
+                  .filter(
+                    (theme) =>
+                      selectedCategory === "all" ||
+                      theme.category === selectedCategory
+                  )
+                  .map((theme, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      onPress={() => {
+                        setSelectedTheme(theme);
+                        setWritingSetting({
+                          projectId: projectId,
+                          backgroundColor: theme.bg,
+                          textColor: theme.text,
+                        });
+                        setShowThemeModal(false);
+                      }}
+                      className="mb-3 rounded-2xl overflow-hidden border-2 active:scale-[0.98] transition-all"
+                      style={{
+                        borderColor:
+                          selectedTheme.name === theme.name
+                            ? theme.accent
+                            : "transparent",
+                        shadowColor: theme.accent,
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity:
+                          selectedTheme.name === theme.name ? 0.3 : 0,
+                        shadowRadius: 4,
+                        elevation: selectedTheme.name === theme.name ? 4 : 0,
+                      }}
+                    >
+                      <View
+                        style={{ backgroundColor: theme.bg }}
+                        className="p-4"
+                      >
+                        <View className="flex-row items-center justify-between mb-3">
+                          <View>
+                            <Text
+                              style={{ color: theme.text }}
+                              className="font-bold text-lg"
+                            >
+                              {theme.name}
+                            </Text>
+                            <View className="flex-row items-center mt-1">
+                              <View
+                                style={{ backgroundColor: theme.accent }}
+                                className="w-3 h-3 rounded-full mr-1"
+                              />
+                              <Text
+                                style={{ color: theme.text + "AA" }}
+                                className="text-xs capitalize"
+                              >
+                                {theme.category}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View className="flex-row items-center">
+                            {/* Preview Colors */}
+                            <View className="flex-row gap-1 mr-3">
+                              <View
+                                style={{ backgroundColor: theme.bg }}
+                                className="w-6 h-6 rounded border border-gray-300"
+                              />
+                              <View
+                                style={{ backgroundColor: theme.text }}
+                                className="w-6 h-6 rounded border border-gray-300"
+                              />
+                              <View
+                                style={{ backgroundColor: theme.accent }}
+                                className="w-6 h-6 rounded border border-gray-300"
+                              />
+                            </View>
+
+                            {selectedTheme.name === theme.name && (
+                              <View
+                                style={{ backgroundColor: theme.accent }}
+                                className="w-8 h-8 rounded-full justify-center items-center"
+                              >
+                                <Text className="text-white font-bold">✓</Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+
+                        {/* Preview Text */}
+                        <View className="bg-white/20 dark:bg-black/20 rounded-lg p-3">
+                          <Text
+                            style={{ color: theme.text }}
+                            className="text-sm italic"
+                          >
+                            The quick brown fox jumps over the lazy dog...
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                  </TouchableOpacity>
-                ))}
+
+                      {/* Status Bar */}
+                      <View
+                        style={{ backgroundColor: theme.accent + "30" }}
+                        className="h-1 w-full"
+                      />
+                    </TouchableOpacity>
+                  ))}
+
+                {/* Current Selection Info */}
+                <View className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 mt-2 mb-4">
+                  <Text className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-1">
+                    💡 Pro Tip
+                  </Text>
+                  <Text className="text-xs text-blue-600 dark:text-blue-400">
+                    • Dark themes reduce eye strain for night writing
+                  </Text>
+                  <Text className="text-xs text-blue-600 dark:text-blue-400">
+                    • Minimal themes help focus on content
+                  </Text>
+                  <Text className="text-xs text-blue-600 dark:text-blue-400">
+                    • Warm tones inspire creativity
+                  </Text>
+                </View>
+
                 <TouchableOpacity
                   onPress={() => setShowThemeModal(false)}
-                  className="bg-light-100 py-4 rounded-full mt-2"
+                  className="bg-gray-100 dark:bg-dark-100 py-4 rounded-full mt-2 active:scale-[0.98]"
                 >
-                  <Text className="text-gray-600 font-bold text-center">
+                  <Text className="text-gray-600 dark:text-light-200 font-bold text-center">
                     Cancel
                   </Text>
                 </TouchableOpacity>
@@ -2535,87 +3211,181 @@ const PoetryDetails = () => {
         </Modal>
 
         {/* Book Preview Modal */}
+
         <Modal
           visible={showBookPreview}
           animationType="slide"
           onRequestClose={() => setShowBookPreview(false)}
+          statusBarTranslucent={true}
         >
-          <View className="flex-1 bg-gray-900">
-            <View className="px-6 pt-16 pb-4 bg-black/50">
-              <View className="flex-row items-center justify-between">
+          <View
+            className="flex-1 "
+            style={{ backgroundColor: selectedTheme.accent }}
+          >
+            {/* Header - Fixed */}
+            <View
+              className="absolute top-0 left-0 right-0 z-50 pt-12 px-4 pb-2"
+              style={{
+                paddingTop: insets.top + 16,
+                backgroundColor: "rgba(15, 23, 42, 0.95)",
+                borderBottomWidth: 1,
+                borderBottomColor: "rgba(255, 255, 255, 0.1)",
+              }}
+            >
+              <View className="flex-row items-center justify-between mb-3">
                 <TouchableOpacity
                   onPress={() => setShowBookPreview(false)}
-                  className="w-10 h-10 rounded-full bg-white/20 justify-center items-center"
+                  className="w-12 h-12 rounded-full bg-white/10 justify-center items-center active:bg-white/20"
                 >
                   <Text className="text-xl text-white">✕</Text>
                 </TouchableOpacity>
-                <Text className="text-lg font-bold text-white">
-                  Poetry Preview
-                </Text>
-                <View className="w-10" />
+
+                <View className="flex-1 mx-4">
+                  <Text className="text-lg font-bold text-white text-center">
+                    {project?.title || "Poetry Collection"}
+                  </Text>
+                  {project?.author_name && (
+                    <Text className="text-sm text-gray-300 text-center">
+                      by {project.author_name}
+                    </Text>
+                  )}
+                </View>
+
+                <View className="w-12 items-center">
+                  <Text className="text-sm text-white font-medium">
+                    {currentPage + 1}/{poems.length}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Scroll Indicator */}
+              <View className="flex-row justify-center gap-1 mb-1">
+                {poems.slice(0, Math.min(10, poems.length)).map((_, index) => (
+                  <View
+                    key={index}
+                    className={`h-1 rounded-full ${
+                      index === currentPage ? "bg-white w-8" : "bg-white/30 w-1"
+                    }`}
+                  />
+                ))}
               </View>
             </View>
-            <ScrollView
+
+            {/* Content - Scrollable Poems */}
+            <FlatList
+              ref={previewListRef}
+              data={poems}
+              keyExtractor={(item) => item.id.toString()}
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               onScroll={(e) => {
-                setCurrentPage(
-                  Math.round(e.nativeEvent.contentOffset.x / width)
-                );
+                const page = Math.round(e.nativeEvent.contentOffset.x / width);
+                setCurrentPage(page);
               }}
               scrollEventThrottle={16}
-            >
-              {poems.map((poem, index) => (
+              renderItem={({ item, index }) => (
                 <View
-                  key={poem.id}
-                  className="px-8 py-12 justify-center"
-                  style={{
-                    width,
-                    backgroundColor: selectedTheme.text,
-                  }}
+                  className="flex-1 justify-center items-center px-6"
+                  style={{ width }}
                 >
+                  {/* Current Poem Info - Sticky */}
                   <View
-                    className="bg-white rounded-2xl p-6 shadow-2xl"
+                    className="absolute top-20 left-6 right-6 z-40 bg-black/40 backdrop-blur-sm rounded-2xl p-4 border border-white/10"
+                    style={{ top: insets.top + 88 }}
+                  >
+                    <View className="flex-row items-center justify-between mb-2">
+                      <View className="flex-1">
+                        <Text className="text-2xl font-bold text-white mb-1">
+                          Poem {index + 1} : {item.name}
+                        </Text>
+                        <View className="flex-row items-center">
+                          <View className="flex-row items-center justify-end">
+                            <Text className="text-xs text-gray-400">
+                              {project?.author_name
+                                ? `— ${project.author_name}`
+                                : "— Anonymous"}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Mood Tag */}
+                      {(() => {
+                        let mood = null;
+                        try {
+                          const meta = JSON.parse(item.metadata || "{}");
+                          mood = MOOD_TAGS.find((m) => m.label === meta.mood);
+                        } catch {}
+                        return mood ? (
+                          <View
+                            className="px-3 py-1 rounded-full"
+                            style={{ backgroundColor: mood.color + "20" }}
+                          >
+                            <Text className="text-xs text-white">
+                              {mood.emoji} {mood.label}
+                            </Text>
+                          </View>
+                        ) : null;
+                      })()}
+                    </View>
+                  </View>
+
+                  {/* Poem Content Container */}
+                  <View
+                    className="w-full rounded-3xl overflow-hidden shadow-2xl"
                     style={{
-                      height: width * 1.6,
+                      height: height * 0.73,
                       backgroundColor: selectedTheme.bg,
+                      marginTop: insets.top + 160,
                     }}
                   >
-                    <Text
-                      className="text-xl font-bold mb-4 text-center"
-                      style={{ color: selectedTheme.text }}
+                    {/* Decorative Corner Elements */}
+                    <View className="absolute top-0 left-0 w-20 h-20 border-t-2 border-l-2 border-white/10" />
+                    <View className="absolute top-0 right-0 w-20 h-20 border-t-2 border-r-2 border-white/10" />
+                    <View className="absolute bottom-0 left-0 w-20 h-20 border-b-2 border-l-2 border-white/10" />
+                    <View className="absolute bottom-0 right-0 w-20 h-20 border-b-2 border-r-2 border-white/10" />
+
+                    {/* Poem Content */}
+                    <ScrollView
+                      className="flex-1 p-8"
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={{ paddingBottom: 40 }}
                     >
-                      {poem.name}
-                    </Text>
-                    <ScrollView showsVerticalScrollIndicator={false}>
                       <Text
-                        className="text-base leading-7 text-center"
+                        className="text-lg leading-8  text-center"
                         style={{
                           fontFamily: "serif",
-                          color: selectedTheme.text,
+                          fontSize: 18,
+                          lineHeight: 32,
+                          color: selectedTheme.accent,
                         }}
                       >
-                        {poem.content || ""}
+                        {item.content || "No content yet..."}
                       </Text>
+
+                      {/* Signature */}
+                      {item.content && (
+                        <View className="pt-2 border-t border-white/10">
+                          <Text
+                            className="text-sm text-gray-400 text-right italic"
+                            style={{
+                              color: selectedTheme.accent,
+                            }}
+                          >
+                            {project?.author_name
+                              ? `— ${project.author_name}`
+                              : "— Anonymous"}
+                          </Text>
+                        </View>
+                      )}
                     </ScrollView>
-                    <Text
-                      className="text-xs text-center mt-4"
-                      style={{ color: selectedTheme.text }}
-                    >
-                      Poem {index + 1} of {poems.length}
-                    </Text>
+
+                    {/* Bottom Stats */}
                   </View>
                 </View>
-              ))}
-            </ScrollView>
-            <View className="absolute bottom-8 left-0 right-0 items-center">
-              <View className="bg-black/50 px-6 py-3 rounded-full">
-                <Text className="text-white font-bold">
-                  {currentPage + 1} of {poems.length}
-                </Text>
-              </View>
-            </View>
+              )}
+            />
           </View>
         </Modal>
       </KeyboardAvoidingLayout>
