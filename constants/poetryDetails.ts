@@ -86,15 +86,210 @@ const writingThemes = [
   { name: "Emotions", emoji: "🎭", prompts: ["joy", "sorrow", "rage"] },
 ];
 
-// Color themes for different moods
+// Replace your existing colorThemes array with this:
+
 const colorThemes = [
-  { name: "Classic", bg: "#FFFFFF", text: "#1F2937", accent: "#6366F1" },
-  { name: "Moonlight", bg: "#0F172A", text: "#E2E8F0", accent: "#93C5FD" },
-  { name: "Vintage", bg: "#F4ECD8", text: "#5C4B37", accent: "#B8860B" },
-  { name: "Lavender", bg: "#F3E5F5", text: "#4A148C", accent: "#9C27B0" },
-  { name: "Ocean", bg: "#E0F7FA", text: "#004D40", accent: "#00ACC1" },
-  { name: "Autumn", bg: "#FFF3E0", text: "#4E342E", accent: "#FF6F00" },
+  // 1. Minimal & Clean
+  {
+    name: "Pure White",
+    bg: "#FFFFFF",
+    text: "#1A1A1A",
+    accent: "#3B82F6",
+    category: "minimal"
+  },
+  
+  // 2. Dark Modern
+  {
+    name: "Midnight",
+    bg: "#0F172A",
+    text: "#F1F5F9",
+    accent: "#60A5FA",
+    category: "dark"
+  },
+  
+  // 3. Warm & Cozy
+  {
+    name: "Parchment",
+    bg: "#FEF3C7",
+    text: "#451A03",
+    accent: "#D97706",
+    category: "warm"
+  },
+  
+  // 4. Cool & Calm
+  {
+    name: "Arctic",
+    bg: "#ECFEFF",
+    text: "#164E63",
+    accent: "#0EA5E9",
+    category: "cool"
+  },
+  
+  // 5. Deep Focus
+  {
+    name: "Deep Forest",
+    bg: "#064E3B",
+    text: "#D1FAE5",
+    accent: "#10B981",
+    category: "nature"
+  },
+  
+  // 6. Sunset Glow
+  {
+    name: "Sunset",
+    bg: "#FEF3C7",
+    text: "#7C2D12",
+    accent: "#F59E0B",
+    category: "warm"
+  },
+  
+  // 7. Ocean Depths
+  {
+    name: "Ocean",
+    bg: "#E0F2FE",
+    text: "#0C4A6E",
+    accent: "#0284C7",
+    category: "cool"
+  },
+  
+  // 8. Modern Charcoal
+  {
+    name: "Charcoal",
+    bg: "#1E293B",
+    text: "#E2E8F0",
+    accent: "#8B5CF6",
+    category: "dark"
+  },
+  
+  // 9. Lavender Dream
+  {
+    name: "Lavender",
+    bg: "#FAF5FF",
+    text: "#4C1D95",
+    accent: "#A855F7",
+    category: "soft"
+  },
+  
+  // 10. Sage Green
+  {
+    name: "Sage",
+    bg: "#F0FDF4",
+    text: "#14532D",
+    accent: "#22C55E",
+    category: "nature"
+  },
+  
+  // 11. Rose Quartz
+  {
+    name: "Rose",
+    bg: "#FDF2F8",
+    text: "#831843",
+    accent: "#EC4899",
+    category: "soft"
+  },
+  
+  // 12. Amber Gold
+  {
+    name: "Amber",
+    bg: "#FFFBEB",
+    text: "#78350F",
+    accent: "#D97706",
+    category: "warm"
+  },
+  
+  // 13. Slate Blue
+  {
+    name: "Slate Blue",
+    bg: "#F8FAFC",
+    text: "#1E293B",
+    accent: "#475569",
+    category: "minimal"
+  },
+  
+  // 14. Noir
+  {
+    name: "Noir",
+    bg: "#000000",
+    text: "#E5E7EB",
+    accent: "#FFFFFF",
+    category: "dark"
+  },
+  
+  // 15. Sepia
+  {
+    name: "Sepia",
+    bg: "#F5E6D3",
+    text: "#5C4033",
+    accent: "#A0522D",
+    category: "vintage"
+  },
+  
+  // 16. Misty Gray
+  {
+    name: "Misty Gray",
+    bg: "#F9FAFB",
+    text: "#374151",
+    accent: "#6B7280",
+    category: "minimal"
+  },
+  
+  // 17. Emerald Night
+  {
+    name: "Emerald",
+    bg: "#022C22",
+    text: "#D1FAE5",
+    accent: "#34D399",
+    category: "nature"
+  },
+  
+  // 18. Twilight
+  {
+    name: "Twilight",
+    bg: "#1E1B4B",
+    text: "#E0E7FF",
+    accent: "#818CF8",
+    category: "dark"
+  },
+  
+  // 19. Cream
+  {
+    name: "Cream",
+    bg: "#FEFCE8",
+    text: "#422006",
+    accent: "#EAB308",
+    category: "warm"
+  },
+  
+  // 20. Graphite
+  {
+    name: "Graphite",
+    bg: "#111827",
+    text: "#F3F4F6",
+    accent: "#9CA3AF",
+    category: "dark"
+  },
+  
+  // Bonus: High Contrast for Accessibility
+  {
+    name: "High Contrast",
+    bg: "#000000",
+    text: "#FFFFFF",
+    accent: "#FFFF00",
+    category: "accessibility"
+  }
 ];
+
+// Optional: Group themes by category for better organization
+const themeCategories = {
+  minimal: ["Pure White", "Slate Blue", "Misty Gray"],
+  dark: ["Midnight", "Charcoal", "Noir", "Twilight", "Graphite"],
+  warm: ["Parchment", "Sunset", "Amber", "Cream"],
+  cool: ["Arctic", "Ocean"],
+  nature: ["Deep Forest", "Sage", "Emerald"],
+  soft: ["Lavender", "Rose"],
+  vintage: ["Sepia"],
+  accessibility: ["High Contrast"]
+};
 
 const prompts = [
       "Write about the space between heartbeats",

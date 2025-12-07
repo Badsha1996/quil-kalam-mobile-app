@@ -12,9 +12,9 @@ export default function KeyboardAvoidingLayout({
 }: Props) {
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1 }}
-      keyboardVerticalOffset={Platform.select({ ios: 0, android: 25 })}
+      keyboardVerticalOffset={Platform.select({ ios: 0, android: 15 })}
     >
       {scrollable ? (
         <ScrollView
